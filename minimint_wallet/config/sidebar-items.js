@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["FINALITY_DELAY",""]],"struct":[["WalletClientConfig",""],["WalletConfig",""]]};
