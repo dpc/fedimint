@@ -911,7 +911,13 @@
 <span id="911">911</span>
 <span id="912">912</span>
 <span id="913">913</span>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::config::MintConfig;
+<span id="914">914</span>
+<span id="915">915</span>
+<span id="916">916</span>
+</pre><pre class="rust"><code><span class="comment">// TODO: unclear if people prefer this
+</span><span class="attribute">#![allow(clippy::assertions_on_result_states)]</span>
+
+<span class="kw">use </span><span class="kw">crate</span>::config::MintConfig;
 <span class="kw">use </span><span class="kw">crate</span>::db::{
     MintAuditItemKey, MintAuditItemKeyPrefix, NonceKey, OutputOutcomeKey,
     ProposedPartialSignatureKey, ProposedPartialSignaturesKeyPrefix, ReceivedPartialSignatureKey,

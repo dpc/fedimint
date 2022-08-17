@@ -110,6 +110,8 @@
 <span id="110">110</span>
 <span id="111">111</span>
 <span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::batch::{BatchItem, DbBatch};
 <span class="kw">use </span><span class="kw">super</span>::Database;
 <span class="kw">use </span><span class="kw">crate</span>::db::PrefixIter;
@@ -133,7 +135,9 @@
     }
 
     <span class="kw">pub fn </span>dump_db(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">for </span>(key, value) <span class="kw">in </span><span class="self">self</span>.data.lock().unwrap().iter() {
+        <span class="kw">let </span>data = <span class="self">self</span>.data.lock().unwrap();
+        <span class="kw">let </span>data_iter = data.iter();
+        <span class="kw">for </span>(key, value) <span class="kw">in </span>data_iter {
             <span class="macro">eprintln!</span>(<span class="string">&quot;{}: {}&quot;</span>, hex::encode(key), hex::encode(value));
         }
     }
