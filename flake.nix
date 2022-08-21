@@ -386,6 +386,7 @@
 
                 tmux
                 tmuxinator
+                docker-compose
 
                 # Nix
                 pkgs.nixpkgs-fmt
