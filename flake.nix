@@ -30,15 +30,18 @@
 
         fenix-channel = fenix.packages.${system}.stable;
 
-        fenix-toolchain = (fenix-channel.withComponents [
-          "rustc"
-          "cargo"
-          "clippy"
-          "rust-analysis"
-          "rust-src"
-          "rustfmt"
-          "llvm-tools-preview"
-        ]);
+        fenix-toolchain = fenix.packages.${system}.combine [
+          (fenix-channel.withComponents [
+            "rustc"
+            "cargo"
+            "clippy"
+            "rust-analysis"
+            "rust-src"
+            "rustfmt"
+            "llvm-tools-preview"
+          ])
+          fenix.packages.${system}.targets.wasm32-unknown-unknown.stable.rust-std
+        ];
 
         craneLib = crane.lib.${system}.overrideToolchain fenix-toolchain;
 
@@ -121,8 +124,8 @@
           src = filterWorkspaceFiles ./.;
 
           buildInputs = with pkgs; [
-            clang
-            gcc
+            clang_14
+            # gcc
             openssl
             pkg-config
             perl
@@ -161,17 +164,24 @@
         # all the dependencies (as dir) to help limit the
         # amount of things that need to rebuild when some
         # file change
-        pkg = { name ? null, dir, port ? 8000, extraDirs ? [ ] }: rec {
+        pkg = { name, bin ? null, target ? null, cargoArtifacts ? workspaceDeps, dir, port ? 8000, extraDirs ? [ ] }: rec {
           package = craneLib.buildPackage (commonArgs // {
-            cargoArtifacts = workspaceDeps;
+            pname = name;
+
+            cargoExtraArgs = "--package ${name}";
+
+            cargoArtifacts = cargoArtifacts;
+
+            CARGO_BUILD_TARGET = target;
+            HOST_CC = "${pkgs.clang_14}/bin/clang";
+            CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_LINKER = "${pkgs.lld_14}/bin/lld";
 
             src = filterModules ([ dir ] ++ extraDirs) ./.;
 
             # if needed we will check the whole workspace at once with `workspaceBuild`
             doCheck = false;
-          } // lib.optionalAttrs (name != null) {
-            pname = name;
-            cargoExtraArgs = "--bin ${name}";
+          } // lib.optionalAttrs (bin != null) {
+            cargoExtraArgs = "--bin ${bin}";
           });
 
           container = pkgs.dockerTools.buildLayeredImage {
@@ -179,7 +189,7 @@
             contents = [ package ];
             config = {
               Cmd = [
-                "${package}/bin/${name}"
+                "${package}/bin/${bin}"
               ];
               ExposedPorts = {
                 "${builtins.toString port}/tcp" = { };
@@ -250,8 +260,8 @@
           nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ cargo-llvm-cov ];
         });
 
-        fedimintd = pkg {
-          name = "fedimintd";
+        fedimint = pkg {
+          name = "fedimint";
           dir = "fedimint";
           extraDirs = [
             "client/cli"
@@ -302,6 +312,27 @@
           ];
         };
 
+        mint-client = pkg {
+          name = "mint-client";
+          dir = "client/client-lib";
+          target = "wasm32-unknown-unknown";
+          # cargoArtifacts = null;
+          extraDirs = [
+            "client/cli"
+            "client/clientd"
+            "client/client-lib"
+            "client/clientd"
+            "crypto/tbs"
+            "fedimint-api"
+            "fedimint-core"
+            "fedimint-derive"
+            "modules/fedimint-ln"
+            "modules/fedimint-mint"
+            "modules/fedimint-wallet"
+          ];
+        };
+
+
         clientd = pkg {
           name = "clientd";
           dir = "client/clientd";
@@ -320,6 +351,7 @@
         };
 
         fedimint-tests = pkg {
+          name = "fedimint-tests";
           dir = "integrationtests";
           extraDirs = [
             "client/cli"
@@ -339,13 +371,14 @@
       in
       {
         packages = {
-          default = fedimintd.package;
+          default = fedimint.package;
 
-          fedimintd = fedimintd.package;
+          fedimint = fedimint.package;
           fedimint-tests = fedimint-tests.package;
           ln-gateway = ln-gateway.package;
           clientd = clientd.package;
           mint-client-cli = mint-client-cli.package;
+          mint-client = mint-client.package;
 
           deps = workspaceDeps;
           workspaceBuild = workspaceBuild;
@@ -361,7 +394,7 @@
           };
 
           container = {
-            fedimintd = fedimintd.container;
+            fedimintd = fedimint.container;
           };
         };
 
