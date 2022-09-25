@@ -22,3 +22,8 @@ ar = "./.cargo/ar.x86_64-linux-android"
 [target.i686-linux-android]
 linker = "./.cargo/ld.i686-linux-android"
 ar = "./.cargo/ar.i686-linux-android"
+
+[target.x86_64-apple-darwin]
+linker = "./.cargo/ld.x86_64-apple-darwin"
+ar = "./.cargo/ar.x86_64-apple-darwin"
+

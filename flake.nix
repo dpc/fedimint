@@ -24,6 +24,9 @@
         pkgs = import nixpkgs {
           inherit system;
         };
+
+        # pkgsMacOS =  import nixpkgs { crossSystem = { config = "x86_64-darwin"; }; currentSystem = system; };
+
         lib = pkgs.lib;
         stdenv = pkgs.stdenv;
 
@@ -45,6 +48,19 @@
           '' else
           ''
           '');
+
+        macosCrossEnvVars = ''
+          # export CC_x86_64_apple_darwin="${pkgs.llvmPackages_14.clang-unwrapped}/bin/clang-14"
+          # export CFLAGS_x86_64_apple_darwin="-I ${pkgs.llvmPackages_14.libclang.lib}/lib/clang/14.0.1/include/"
+          # export CC_x86_64_apple_darwin="${pkgs.llvmPackages_14.clang}/bin/clang"
+          # https://godot-rust.github.io/book/exporting/macosx.html
+          # https://github.com/tpoechtrager/osxcross/issues/45#issuecomment-187329253
+          export CC_x86_64_apple_darwin="${pkgs.ios-cross-compile}/bin/clang"
+          export CFLAGS_x86_64_apple_darwin="-I ${pkgs.llvmPackages_14.libclang.lib}/lib/clang/14.0.1/include/"
+          export LD_x86_64_apple_darwin="${pkgs.llvmPackages_14.clang}/bin/clang"
+          # export LD_x86_64_apple_darwin="${pkgs.lld_13}/bin/lld"
+          export LDFLAGS_x86_64_apple_darwin=""
+        '';
 
         # All the environment variables we need for all android cross compilation targets
         androidCrossEnvVars = ''
@@ -86,6 +102,10 @@
               "wasm32" = {
                 name = "wasm32-unknown-unknown";
                 extraEnvs = wasm32CrossEnvVars;
+              };
+              "macos" = {
+                name = "x86_64-apple-darwin";
+                extraEnvs = macosCrossEnvVars;
               };
               "armv7-android" = {
                 name = "armv7-linux-androideabi";
@@ -679,7 +699,7 @@
 
                 # Android NDK not available for Arm MacOS
                 (if isArch64Darwin then "" else androidCrossEnvVars)
-                + wasm32CrossEnvVars;
+                + wasm32CrossEnvVars + macosCrossEnvVars;
             });
 
             # this shell is used only in CI, so it should contain minimum amount

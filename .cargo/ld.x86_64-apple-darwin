@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+exec "$LD_x86_64_apple_darwin" $LDFLAGS_x86_64_apple_darwin "$@"
