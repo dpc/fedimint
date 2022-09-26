@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+exec "$AR_wasm32_unknown_unknown" "$ARFLAGS_wasm32_unknown_unknown" "$@"
