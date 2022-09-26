@@ -38,9 +38,23 @@
         # Env vars we need for wasm32 cross compilation
         wasm32CrossEnvVars = ''
           # Fix wasm32 compilation
-          export CC_wasm32_unknown_unknown="${pkgs.llvmPackages_14.clang-unwrapped}/bin/clang-14"
-          export CFLAGS_wasm32_unknown_unknown="-I ${pkgs.llvmPackages_14.libclang.lib}/lib/clang/14.0.1/include/"
-        '';
+          # export LD_wasm32_unknown_unknown="${pkgs.llvmPackages_14.clang}/bin/clang"
+          # export LD_wasm32_unknown_unknown="${pkgs.gcc}/bin/cc"
+          # export LD_wasm32_unknown_unknown="${pkgs.llvmPackages_14.clang}/bin/ld"
+          # export LD_wasm32_unknown_unknown="${pkgs.llvmPackages_14.clang-unwrapped}/bin/clang-14"
+          # export LDFLAGS_wasm32_unknown_unknown="-dead_strip -L ${pkgs.glibc_multi}/lib"
+          #
+        '' + (if isArch64Darwin then
+          ''
+            export CC_wasm32_unknown_unknown="${pkgs.llvmPackages_14.clang-unwrapped}/bin/clang-14"
+            export CFLAGS_wasm32_unknown_unknown="-I ${pkgs.llvmPackages_14.libclang.lib}/lib/clang/14.0.1/include/"
+            export LD_wasm32_unknown_unknown="${pkgs.llvmPackages_13.bintools-unwrapped}/bin/wasm-ld"
+          '' else
+          ''
+            export CC_wasm32_unknown_unknown="${pkgs.llvmPackages_14.clang-unwrapped}/bin/clang-14"
+            export CFLAGS_wasm32_unknown_unknown="-I ${pkgs.llvmPackages_14.libclang.lib}/lib/clang/14.0.1/include/"
+            export LD_wasm32_unknown_unknown="${pkgs.llvmPackages_13.bintools-unwrapped}/bin/wasm-ld"
+          '');
 
         # All the environment variables we need for all android cross compilation targets
         androidCrossEnvVars = ''
