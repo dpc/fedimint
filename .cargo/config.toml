@@ -7,11 +7,6 @@ rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 # linker = "clang"
 # rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 
-[target.wasm32-unknown-unknown]
-linker = "./.cargo/ld.wasm32-unknown-unknown"
-ar = "./.cargo/ar.wasm32-unknown-unknown"
-rustflags = ["-C", "linker-flavor=wasm-ld"]
-
 [target.armv7-linux-androideabi]
 linker = "./.cargo/ld.armv7-linux-androideabi"
 ar = "./.cargo/ar.armv7-linux-androideabi"

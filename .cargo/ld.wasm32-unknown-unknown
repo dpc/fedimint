@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-
-exec "$LD_wasm32_unknown_unknown" $LDFLAGS_wasm32_unknown_unknown "$@"
