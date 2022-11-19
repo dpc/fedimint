@@ -243,9 +243,10 @@ impl LnGateway {
             .await
     }
 
-    pub async fn run(&mut self) -> Result<()> {
-        self.task_group
-            .spawn("Running Gateway", |handle| async move {
+    pub async fn run(mut self) -> Result<()> {
+        let mut task_group = self.task_group.clone();
+        task_group
+            .spawn("Running Gateway", move |handle| async move {
                 // TODO: try to drive forward outgoing and incoming payments that were interrupted
                 while !handle.is_shutting_down() {
                     let least_wait_until = Instant::now() + Duration::from_millis(100);
@@ -297,7 +298,8 @@ impl LnGateway {
 
                     fedimint_api::task::sleep_until(least_wait_until).await;
                 }
-            });
+            })
+            .await;
         Ok(())
     }
 }
