@@ -12,9 +12,9 @@ use fedimint_api::config::{
     scalar, ClientModuleConfig, DkgPeerMsg, DkgRunner, ModuleConfigGenParams, ServerModuleConfig,
     TypedServerModuleConfig,
 };
-use fedimint_api::core::{Decoder, ModuleKey, MODULE_KEY_MINT};
-use fedimint_api::db::{Database, DatabaseTransaction};
-use fedimint_api::encoding::{Decodable, Encodable, ModuleRegistry};
+use fedimint_api::core::{ModuleKey, MODULE_KEY_MINT};
+use fedimint_api::db::DatabaseTransaction;
+use fedimint_api::encoding::{Decodable, Encodable};
 use fedimint_api::module::__reexports::serde_json;
 use fedimint_api::module::audit::Audit;
 use fedimint_api::module::interconnect::ModuleInterconect;
@@ -65,8 +65,6 @@ pub struct Mint {
     sec_key: Tiered<SecretKeyShare>,
     pub_key_shares: BTreeMap<PeerId, Tiered<PublicKeyShare>>,
     pub_key: HashMap<Amount, AggregatePublicKey>,
-    non_consensus_db: Database,
-    decoders: ModuleRegistry<Decoder>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Encodable, Decodable)]
@@ -314,13 +312,8 @@ impl ServerModulePlugin for Mint {
         }
     }
 
-    async fn consensus_proposal(
-        &self,
-        _dbtx: &DatabaseTransaction<'_>,
-    ) -> Vec<Self::ConsensusItem> {
-        self.non_consensus_db
-            .begin_transaction(self.decoders.clone())
-            .find_by_prefix(&ProposedPartialSignaturesKeyPrefix)
+    async fn consensus_proposal(&self, dbtx: &DatabaseTransaction<'_>) -> Vec<Self::ConsensusItem> {
+        dbtx.find_by_prefix(&ProposedPartialSignaturesKeyPrefix)
             .map(|res| {
                 let (key, partial_signature) = res.expect("DB error");
                 MintConsensusItem(PartiallySignedRequest {
@@ -608,12 +601,9 @@ impl ServerModulePlugin for Mint {
 
     fn output_status(
         &self,
-        _dbtx: &mut DatabaseTransaction<'_>,
+        dbtx: &mut DatabaseTransaction<'_>,
         out_point: OutPoint,
     ) -> Option<Self::OutputOutcome> {
-        let dbtx = self
-            .non_consensus_db
-            .begin_transaction(self.decoders.clone());
         let we_proposed = dbtx
             .get_value(&ProposedPartialSignatureKey { out_point })
             .expect("DB error")
@@ -637,19 +627,13 @@ impl ServerModulePlugin for Mint {
         }
     }
 
-    fn audit(&self, _dbtx: &DatabaseTransaction<'_>, audit: &mut Audit) {
-        audit.add_items(
-            &self
-                .non_consensus_db
-                .begin_transaction(self.decoders.clone()),
-            &MintAuditItemKeyPrefix,
-            |k, v| match k {
-                MintAuditItemKey::Issuance(_) => -(v.milli_sat as i64),
-                MintAuditItemKey::IssuanceTotal => -(v.milli_sat as i64),
-                MintAuditItemKey::Redemption(_) => v.milli_sat as i64,
-                MintAuditItemKey::RedemptionTotal => v.milli_sat as i64,
-            },
-        );
+    fn audit(&self, dbtx: &DatabaseTransaction<'_>, audit: &mut Audit) {
+        audit.add_items(dbtx, &MintAuditItemKeyPrefix, |k, v| match k {
+            MintAuditItemKey::Issuance(_) => -(v.milli_sat as i64),
+            MintAuditItemKey::IssuanceTotal => -(v.milli_sat as i64),
+            MintAuditItemKey::Redemption(_) => v.milli_sat as i64,
+            MintAuditItemKey::RedemptionTotal => v.milli_sat as i64,
+        });
     }
 
     fn api_base_name(&self) -> &'static str {
@@ -660,16 +644,18 @@ impl ServerModulePlugin for Mint {
         vec![
             api_endpoint! {
                 "/backup",
-                async |module: &Mint, _dbtx, request: SignedBackupRequest| -> () {
+                async |module: &Mint, dbtx, request: SignedBackupRequest| -> () {
                     module
-                        .handle_backup_request(request).await
+                        .handle_backup_request(&mut dbtx, request).await?;
+                    dbtx.commit_tx().await.map_err(|e| ApiError::new(1000, format!("Transaction error: {}", e)))?;
+                    Ok(())
                 }
             },
             api_endpoint! {
                 "/recover",
-                async |module: &Mint, _dbtx, id: secp256k1_zkp::XOnlyPublicKey| -> Vec<u8> {
+                async |module: &Mint, dbtx, id: secp256k1_zkp::XOnlyPublicKey| -> Vec<u8> {
                     module
-                        .handle_recover_request(id).await
+                        .handle_recover_request(&dbtx, id).await
                         .ok_or_else(|| ApiError::not_found(String::from("Backup not found")))
                 }
             },
@@ -678,14 +664,14 @@ impl ServerModulePlugin for Mint {
 }
 
 impl Mint {
-    async fn handle_backup_request(&self, request: SignedBackupRequest) -> Result<(), ApiError> {
+    async fn handle_backup_request(
+        &self,
+        dbtx: &mut DatabaseTransaction<'_>,
+        request: SignedBackupRequest,
+    ) -> Result<(), ApiError> {
         let request = request
             .verify_valid(SECP256K1)
             .map_err(|_| ApiError::bad_request("invalid request".into()))?;
-
-        let mut dbtx = self
-            .non_consensus_db
-            .begin_transaction(self.decoders.clone());
 
         if let Some(prev) = dbtx
             .get_value(&EcashBackupKey(request.id))
@@ -709,10 +695,12 @@ impl Mint {
         Ok(())
     }
 
-    async fn handle_recover_request(&self, id: secp256k1_zkp::XOnlyPublicKey) -> Option<Vec<u8>> {
-        self.non_consensus_db
-            .begin_transaction(self.decoders.clone())
-            .get_value(&EcashBackupKey(id))
+    async fn handle_recover_request(
+        &self,
+        dbtx: &DatabaseTransaction<'_>,
+        id: secp256k1_zkp::XOnlyPublicKey,
+    ) -> Option<Vec<u8>> {
+        dbtx.get_value(&EcashBackupKey(id))
             .expect("DB error")
             .map(|res| res.data)
     }
@@ -725,7 +713,7 @@ impl Mint {
     /// * If there are no amount tiers
     /// * If the amount tiers for secret and public keys are inconsistent
     /// * If the pub key belonging to the secret key share is not in the pub key list.
-    pub fn new(cfg: MintConfig, db: Database, decoders: ModuleRegistry<Decoder>) -> Mint {
+    pub fn new(cfg: MintConfig) -> Mint {
         assert!(cfg.tbs_sks.tiers().count() > 0);
 
         // The amount tiers are implicitly provided by the key sets, make sure they are internally
@@ -770,8 +758,6 @@ impl Mint {
             sec_key: cfg.tbs_sks,
             pub_key_shares: cfg.peer_tbs_pks,
             pub_key: aggregate_pub_keys,
-            non_consensus_db: db,
-            decoders,
         }
     }
 
@@ -1054,18 +1040,12 @@ impl From<InvalidAmountTierError> for MintError {
 #[cfg(test)]
 mod test {
     use fedimint_api::config::{ClientModuleConfig, ModuleConfigGenParams, ServerModuleConfig};
-    use fedimint_api::core::{Decoder, MODULE_KEY_MINT};
-    use fedimint_api::db::mem_impl::MemDatabase;
-    use fedimint_api::encoding::ModuleRegistry;
     use fedimint_api::module::FederationModuleConfigGen;
     use fedimint_api::{Amount, PeerId, TieredMulti};
     use tbs::{blind_message, unblind_signature, verify, AggregatePublicKey, BlindingKey, Message};
 
     use crate::config::{FeeConsensus, MintClientConfig};
-    use crate::{
-        BlindNonce, CombineError, Mint, MintConfig, MintConfigGenerator, MintModuleDecoder,
-        PeerErrorType,
-    };
+    use crate::{BlindNonce, CombineError, Mint, MintConfig, MintConfigGenerator, PeerErrorType};
 
     const THRESHOLD: usize = 1;
     const MINTS: usize = 5;
@@ -1087,15 +1067,7 @@ mod test {
         let (mint_cfg, client_cfg) = build_configs();
         let mints = mint_cfg
             .into_iter()
-            .map(|config| {
-                Mint::new(
-                    config.to_typed().unwrap(),
-                    MemDatabase::new().into(),
-                    vec![(MODULE_KEY_MINT, Decoder::from_typed(MintModuleDecoder))]
-                        .into_iter()
-                        .collect(),
-                )
-            })
+            .map(|config| Mint::new(config.to_typed().unwrap()))
             .collect::<Vec<_>>();
 
         let agg_pk = *client_cfg
@@ -1257,21 +1229,17 @@ mod test {
         let (mint_server_cfg1, _) = build_configs();
         let (mint_server_cfg2, _) = build_configs();
 
-        Mint::new(
-            MintConfig {
-                threshold: THRESHOLD,
-                tbs_sks: mint_server_cfg1[0]
-                    .to_typed::<MintConfig>()
-                    .unwrap()
-                    .tbs_sks,
-                peer_tbs_pks: mint_server_cfg2[0]
-                    .to_typed::<MintConfig>()
-                    .unwrap()
-                    .peer_tbs_pks,
-                fee_consensus: FeeConsensus::default(),
-            },
-            MemDatabase::new().into(),
-            ModuleRegistry::default(),
-        );
+        Mint::new(MintConfig {
+            threshold: THRESHOLD,
+            tbs_sks: mint_server_cfg1[0]
+                .to_typed::<MintConfig>()
+                .unwrap()
+                .tbs_sks,
+            peer_tbs_pks: mint_server_cfg2[0]
+                .to_typed::<MintConfig>()
+                .unwrap()
+                .peer_tbs_pks,
+            fee_consensus: FeeConsensus::default(),
+        });
     }
 }
