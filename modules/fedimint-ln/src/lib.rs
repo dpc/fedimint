@@ -271,13 +271,16 @@ impl ServerModulePlugin for LightningModule {
         LightningModuleDecoder
     }
 
-    async fn await_consensus_proposal(&self, dbtx: &DatabaseTransaction<'_>) {
+    async fn await_consensus_proposal(&self, dbtx: &mut DatabaseTransaction<'_>) {
         if self.consensus_proposal(dbtx).await.is_empty() {
             std::future::pending().await
         }
     }
 
-    async fn consensus_proposal(&self, dbtx: &DatabaseTransaction<'_>) -> Vec<Self::ConsensusItem> {
+    async fn consensus_proposal(
+        &self,
+        dbtx: &mut DatabaseTransaction<'_>,
+    ) -> Vec<Self::ConsensusItem> {
         dbtx.find_by_prefix(&ProposeDecryptionShareKeyPrefix)
             .map(|res| {
                 let (ProposeDecryptionShareKey(contract_id), share) = res.expect("DB error");
@@ -320,6 +323,7 @@ impl ServerModulePlugin for LightningModule {
     ) -> Result<InputMeta, ModuleError> {
         let account: ContractAccount = self
             .get_contract_account(dbtx, input.contract_id)
+            .await
             .ok_or(LightningModuleError::UnknownContract(input.contract_id))
             .into_module_error_other()?;
 
@@ -398,6 +402,7 @@ impl ServerModulePlugin for LightningModule {
         let account_db_key = ContractKey(input.contract_id);
         let mut contract_account = dbtx
             .get_value(&account_db_key)
+            .await
             .expect("DB error")
             .expect("Should fail validation if contract account doesn't exist");
         contract_account.amount -= meta.amount.amount;
@@ -408,9 +413,9 @@ impl ServerModulePlugin for LightningModule {
         Ok(meta)
     }
 
-    fn validate_output(
+    async fn validate_output(
         &self,
-        dbtx: &DatabaseTransaction,
+        dbtx: &mut DatabaseTransaction<'_>,
         output: &Self::Output,
     ) -> Result<TransactionItemAmount, ModuleError> {
         match output {
@@ -419,6 +424,7 @@ impl ServerModulePlugin for LightningModule {
                 if let Contract::Incoming(incoming) = &contract.contract {
                     let offer = dbtx
                         .get_value(&OfferKey(incoming.hash))
+                        .await
                         .expect("DB error")
                         .ok_or(LightningModuleError::NoOffer(incoming.hash))
                         .into_module_error_other()?;
@@ -455,6 +461,7 @@ impl ServerModulePlugin for LightningModule {
             } => {
                 let contract_account = dbtx
                     .get_value(&ContractKey(*contract))
+                    .await
                     .expect("DB error")
                     .ok_or(LightningModuleError::UnknownContract(*contract))
                     .into_module_error_other()?;
@@ -487,13 +494,14 @@ impl ServerModulePlugin for LightningModule {
         output: &'a Self::Output,
         out_point: OutPoint,
     ) -> Result<TransactionItemAmount, ModuleError> {
-        let amount = self.validate_output(dbtx, output)?;
+        let amount = self.validate_output(dbtx, output).await?;
 
         match output {
             LightningOutput::Contract(contract) => {
                 let contract_db_key = ContractKey(contract.contract.contract_id());
                 let updated_contract_account = dbtx
                     .get_value(&contract_db_key)
+                    .await
                     .expect("DB error")
                     .map(|mut value: ContractAccount| {
                         value.amount += amount.amount;
@@ -520,6 +528,7 @@ impl ServerModulePlugin for LightningModule {
                 if let Contract::Incoming(incoming) = &contract.contract {
                     let offer = dbtx
                         .get_value(&OfferKey(incoming.hash))
+                        .await
                         .expect("DB error")
                         .expect("offer exists if output is valid");
 
@@ -555,6 +564,7 @@ impl ServerModulePlugin for LightningModule {
                 let updated_contract_account = {
                     let mut contract_account = dbtx
                         .get_value(&ContractKey(*contract))
+                        .await
                         .expect("DB error")
                         .expect("Contract exists if output is valid");
 
@@ -600,7 +610,7 @@ impl ServerModulePlugin for LightningModule {
             let span = info_span!("decrypt_preimage", %contract_id);
             let _gaurd = span.enter();
 
-            let incoming_contract = match self.get_contract_account(dbtx, contract_id) {
+            let incoming_contract = match self.get_contract_account(dbtx, contract_id).await {
                 Some(ContractAccount {
                     contract: FundedContract::Incoming(incoming),
                     ..
@@ -644,6 +654,7 @@ impl ServerModulePlugin for LightningModule {
 
             let contract = self
                 .get_contract_account(dbtx, contract_id)
+                .await
                 .expect("decryption shares without contracts should be discarded earlier"); // FIXME: verify
 
             let (incoming_contract, out_point) = match contract.contract {
@@ -709,6 +720,7 @@ impl ServerModulePlugin for LightningModule {
             let contract_db_key = ContractKey(contract_id);
             let mut contract_account = dbtx
                 .get_value(&contract_db_key)
+                .await
                 .expect("DB error")
                 .expect("checked before that it exists");
             let mut incoming = match &mut contract_account.contract {
@@ -725,6 +737,7 @@ impl ServerModulePlugin for LightningModule {
             let outcome_db_key = ContractUpdateKey(out_point);
             let mut outcome = dbtx
                 .get_value(&outcome_db_key)
+                .await
                 .expect("DB error")
                 .expect("outcome was created on funding");
             let incoming_contract_outcome_preimage = match &mut outcome {
@@ -743,12 +756,13 @@ impl ServerModulePlugin for LightningModule {
         bad_peers
     }
 
-    fn output_status(
+    async fn output_status(
         &self,
         dbtx: &mut DatabaseTransaction<'_>,
         out_point: OutPoint,
     ) -> Option<Self::OutputOutcome> {
         dbtx.get_value(&ContractUpdateKey(out_point))
+            .await
             .expect("DB error")
     }
 
@@ -768,7 +782,8 @@ impl ServerModulePlugin for LightningModule {
                 "/account",
                 async |module: &LightningModule, dbtx, contract_id: ContractId| -> ContractAccount {
                     module
-                        .get_contract_account(&dbtx, contract_id)
+                        .get_contract_account(&mut dbtx, contract_id)
+                        .await
                         .ok_or_else(|| ApiError::not_found(String::from("Contract not found")))
                 }
             },
@@ -782,7 +797,8 @@ impl ServerModulePlugin for LightningModule {
                 "/offer",
                 async |module: &LightningModule, dbtx, payment_hash: bitcoin_hashes::sha256::Hash| -> IncomingContractOffer {
                     let offer = module
-                        .get_offer(&dbtx, payment_hash)
+                        .get_offer(&mut dbtx, payment_hash)
+                        .await
                         .ok_or_else(|| ApiError::not_found(String::from("Offer not found")))?;
 
                     debug!(%payment_hash, "Sending offer info");
@@ -824,12 +840,14 @@ impl LightningModule {
             .verify_decryption_share(&share.0, &message.0)
     }
 
-    pub fn get_offer(
+    pub async fn get_offer(
         &self,
-        dbtx: &DatabaseTransaction,
+        dbtx: &mut DatabaseTransaction<'_>,
         payment_hash: bitcoin_hashes::sha256::Hash,
     ) -> Option<IncomingContractOffer> {
-        dbtx.get_value(&OfferKey(payment_hash)).expect("DB error")
+        dbtx.get_value(&OfferKey(payment_hash))
+            .await
+            .expect("DB error")
     }
 
     pub fn get_offers(&self, dbtx: &DatabaseTransaction) -> Vec<IncomingContractOffer> {
@@ -838,12 +856,14 @@ impl LightningModule {
             .collect()
     }
 
-    pub fn get_contract_account(
+    pub async fn get_contract_account(
         &self,
-        dbtx: &DatabaseTransaction,
+        dbtx: &mut DatabaseTransaction<'_>,
         contract_id: ContractId,
     ) -> Option<ContractAccount> {
-        dbtx.get_value(&ContractKey(contract_id)).expect("DB error")
+        dbtx.get_value(&ContractKey(contract_id))
+            .await
+            .expect("DB error")
     }
 
     pub fn list_gateways(&self, dbtx: &DatabaseTransaction) -> Vec<LightningGateway> {

@@ -92,23 +92,23 @@ impl<'a> DatabaseDump<'a> {
 
     /// Iterates through all the specified ranges in the database and retrieves the
     /// data for each range. Prints serialized contents at the end.
-    pub fn dump_database(&mut self) {
+    pub async fn dump_database(&mut self) {
         for range in self.ranges.clone() {
             match range.as_str() {
                 "consensus" => {
-                    self.get_consensus_data();
+                    self.get_consensus_data().await;
                 }
                 "mint" => {
                     self.get_mint_data();
                 }
                 "wallet" => {
-                    self.get_wallet_data();
+                    self.get_wallet_data().await;
                 }
                 "lightning" => {
                     self.get_lightning_data();
                 }
                 "mintclient" => {
-                    self.get_mint_client_data();
+                    self.get_mint_client_data().await;
                 }
                 "lightningclient" => {
                     self.get_ln_client_data();
@@ -117,7 +117,7 @@ impl<'a> DatabaseDump<'a> {
                     self.get_wallet_client_data();
                 }
                 "client" => {
-                    self.get_client_data();
+                    self.get_client_data().await;
                 }
                 _ => {}
             }
@@ -128,7 +128,7 @@ impl<'a> DatabaseDump<'a> {
 
     /// Iterates through each of the prefixes within the consensus range and retrieves
     /// the corresponding data.
-    fn get_consensus_data(&mut self) {
+    async fn get_consensus_data(&mut self) {
         let mut consensus: BTreeMap<String, Box<dyn Serialize>> = BTreeMap::new();
 
         for table in ConsensusRange::DbKeyPrefix::iter() {
@@ -188,6 +188,7 @@ impl<'a> DatabaseDump<'a> {
                     let last_epoch = self
                         .read_only
                         .get_value(&ConsensusRange::LastEpochKey)
+                        .await
                         .unwrap();
                     if let Some(last_epoch) = last_epoch {
                         consensus.insert("LastEpoch".to_string(), Box::new(last_epoch));
@@ -275,7 +276,7 @@ impl<'a> DatabaseDump<'a> {
 
     /// Iterates through each of the prefixes within the wallet range and retrieves
     /// the corresponding data.
-    fn get_wallet_data(&mut self) {
+    async fn get_wallet_data(&mut self) {
         let mut wallet: BTreeMap<String, Box<dyn Serialize>> = BTreeMap::new();
         for table in WalletRange::DbKeyPrefix::iter() {
             filter_prefixes!(table, self);
@@ -324,6 +325,7 @@ impl<'a> DatabaseDump<'a> {
                     let round_consensus = self
                         .read_only
                         .get_value(&WalletRange::RoundConsensusKey)
+                        .await
                         .unwrap();
                     if let Some(round_consensus) = round_consensus {
                         wallet.insert("Round Consensus".to_string(), Box::new(round_consensus));
@@ -497,7 +499,7 @@ impl<'a> DatabaseDump<'a> {
 
     /// Iterates through each of the prefixes within the mint client range and retrieves
     /// the corresponding data.
-    fn get_mint_client_data(&mut self) {
+    async fn get_mint_client_data(&mut self) {
         let mut mint_client: BTreeMap<String, Box<dyn Serialize>> = BTreeMap::new();
         for table in ClientMintRange::DbKeyPrefix::iter() {
             filter_prefixes!(table, self);
@@ -537,6 +539,7 @@ impl<'a> DatabaseDump<'a> {
                     let last_ecash_note = self
                         .read_only
                         .get_value(&ClientMintRange::LastECashNoteIndexKey)
+                        .await
                         .unwrap();
                     if let Some(last_ecash_note) = last_ecash_note {
                         mint_client.insert(
@@ -577,7 +580,7 @@ impl<'a> DatabaseDump<'a> {
             .insert("Client Wallet".to_string(), Box::new(wallet_client));
     }
 
-    fn get_client_data(&mut self) {
+    async fn get_client_data(&mut self) {
         let mut client: BTreeMap<String, Box<dyn Serialize>> = BTreeMap::new();
 
         for table in ClientRange::DbKeyPrefix::iter() {
@@ -588,6 +591,7 @@ impl<'a> DatabaseDump<'a> {
                     let secret = self
                         .read_only
                         .get_value(&ClientRange::ClientSecretKey)
+                        .await
                         .unwrap();
                     if let Some(secret) = secret {
                         client.insert("Client Secret".to_string(), Box::new(secret));
@@ -630,7 +634,8 @@ struct Args {
     flag_prefix: String,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args: Args = Docopt::new(USAGE)
         .and_then(|d| d.deserialize())
         .unwrap_or_else(|e| e.exit());
@@ -670,5 +675,5 @@ fn main() {
         include_all_prefixes: csv_prefix == "All",
     };
 
-    dbdump.dump_database();
+    dbdump.dump_database().await;
 }

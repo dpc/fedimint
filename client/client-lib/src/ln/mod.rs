@@ -265,12 +265,13 @@ impl<'c> LnClient<'c> {
         dbtx.commit_tx().await.expect("DB Error");
     }
 
-    pub fn get_confirmed_invoice(&self, contract_id: ContractId) -> Result<ConfirmedInvoice> {
+    pub async fn get_confirmed_invoice(&self, contract_id: ContractId) -> Result<ConfirmedInvoice> {
         let confirmed_invoice = self
             .context
             .db
             .begin_transaction(ModuleRegistry::default())
             .get_value(&ConfirmedInvoiceKey(contract_id))
+            .await
             .expect("Db error")
             .ok_or(LnClientError::NoConfirmedInvoice(contract_id))?;
         Ok(confirmed_invoice)
@@ -361,6 +362,8 @@ mod tests {
             &self,
             tx: TransactionId,
         ) -> crate::api::Result<TransactionStatus> {
+            // TODO: output_outcome is not Send
+            /*
             let mint = self.mint.lock().await;
             Ok(TransactionStatus::Accepted {
                 epoch: 0,
@@ -369,9 +372,12 @@ mod tests {
                         txid: tx,
                         out_idx: 0,
                     })
+                    .await
                     .unwrap(),
                 ))],
             })
+            */
+            todo!();
         }
 
         async fn submit_transaction(
@@ -385,17 +391,19 @@ mod tests {
             &self,
             contract: ContractId,
         ) -> crate::api::Result<ContractAccount> {
-            Ok(self
-                .mint
-                .lock()
-                .await
-                .fetch_from_all(|m, db| {
-                    m.get_contract_account(
-                        &db.begin_transaction(ModuleRegistry::default()),
-                        contract,
-                    )
-                })
-                .unwrap())
+            let mut results = Vec::new();
+            for (_, member, db) in self.mint.lock().await.members.iter_mut() {
+                results.push(
+                    member
+                        .get_contract_account(
+                            &mut db.begin_transaction(ModuleRegistry::default()),
+                            contract,
+                        )
+                        .await,
+                );
+            }
+            let contract_account = fedimint_testing::assert_all_equal(results.into_iter());
+            Ok(contract_account.unwrap())
         }
 
         async fn fetch_consensus_block_height(&self) -> crate::api::Result<u64> {

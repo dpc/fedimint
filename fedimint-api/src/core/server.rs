@@ -69,10 +69,10 @@ pub trait IServerModule: Debug {
     fn decode_consensus_item(&self, r: &mut dyn io::Read) -> Result<ConsensusItem, DecodeError>;
 
     /// Blocks until a new `consensus_proposal` is available.
-    async fn await_consensus_proposal(&self, dbtx: &DatabaseTransaction<'_>);
+    async fn await_consensus_proposal(&self, dbtx: &mut DatabaseTransaction<'_>);
 
     /// This module's contribution to the next consensus proposal
-    async fn consensus_proposal(&self, dbtx: &DatabaseTransaction<'_>) -> Vec<ConsensusItem>;
+    async fn consensus_proposal(&self, dbtx: &mut DatabaseTransaction<'_>) -> Vec<ConsensusItem>;
 
     /// This function is called once before transaction processing starts. All module consensus
     /// items of this round are supplied as `consensus_items`. The batch will be committed to the
@@ -121,9 +121,9 @@ pub trait IServerModule: Debug {
     /// function has no side effects and may be called at any time. False positives due to outdated
     /// database state are ok since they get filtered out after consensus has been reached on them
     /// and merely generate a warning.
-    fn validate_output(
+    async fn validate_output(
         &self,
-        dbtx: &DatabaseTransaction,
+        dbtx: &mut DatabaseTransaction<'_>,
         output: &Output,
     ) -> Result<TransactionItemAmount, ModuleError>;
 
@@ -158,7 +158,7 @@ pub trait IServerModule: Debug {
     /// Retrieve the current status of the output. Depending on the module this might contain data
     /// needed by the client to access funds or give an estimate of when funds will be available.
     /// Returns `None` if the output is unknown, **NOT** if it is just not ready yet.
-    fn output_status(
+    async fn output_status(
         &self,
         dbtx: &mut DatabaseTransaction<'_>,
         out_point: OutPoint,
@@ -244,12 +244,12 @@ where
     }
 
     /// Blocks until a new `consensus_proposal` is available.
-    async fn await_consensus_proposal(&self, dbtx: &DatabaseTransaction<'_>) {
+    async fn await_consensus_proposal(&self, dbtx: &mut DatabaseTransaction<'_>) {
         <Self as ServerModulePlugin>::await_consensus_proposal(self, dbtx).await
     }
 
     /// This module's contribution to the next consensus proposal
-    async fn consensus_proposal(&self, dbtx: &DatabaseTransaction<'_>) -> Vec<ConsensusItem> {
+    async fn consensus_proposal(&self, dbtx: &mut DatabaseTransaction<'_>) -> Vec<ConsensusItem> {
         <Self as ServerModulePlugin>::consensus_proposal(self, dbtx)
             .await
             .into_iter()
@@ -365,9 +365,9 @@ where
     /// function has no side effects and may be called at any time. False positives due to outdated
     /// database state are ok since they get filtered out after consensus has been reached on them
     /// and merely generate a warning.
-    fn validate_output(
+    async fn validate_output(
         &self,
-        dbtx: &DatabaseTransaction,
+        dbtx: &mut DatabaseTransaction<'_>,
         output: &Output,
     ) -> Result<TransactionItemAmount, ModuleError> {
         <Self as ServerModulePlugin>::validate_output(
@@ -378,6 +378,7 @@ where
                 .downcast_ref::<<Self as ServerModulePlugin>::Output>()
                 .expect("incorrect output type passed to module plugin"),
         )
+        .await
     }
 
     /// Try to create an output (e.g. issue coins, peg-out BTC, …). On success all necessary updates
@@ -424,12 +425,14 @@ where
     /// Retrieve the current status of the output. Depending on the module this might contain data
     /// needed by the client to access funds or give an estimate of when funds will be available.
     /// Returns `None` if the output is unknown, **NOT** if it is just not ready yet.
-    fn output_status(
+    async fn output_status(
         &self,
         dbtx: &mut DatabaseTransaction<'_>,
         out_point: OutPoint,
     ) -> Option<OutputOutcome> {
-        <Self as ServerModulePlugin>::output_status(self, dbtx, out_point).map(Into::into)
+        <Self as ServerModulePlugin>::output_status(self, dbtx, out_point)
+            .await
+            .map(Into::into)
     }
 
     /// Queries the database and returns all assets and liabilities of the module.

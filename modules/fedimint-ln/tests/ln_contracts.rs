@@ -59,7 +59,7 @@ async fn test_account() {
     let outputs = [(account_out_point, account_output)];
 
     fed.consensus_round(&[], &outputs).await;
-    match fed.output_outcome(account_out_point).unwrap() {
+    match fed.output_outcome(account_out_point).await.unwrap() {
         LightningOutputOutcome::Contract { outcome, .. } => {
             assert_eq!(outcome, ContractOutcome::Account(AccountContractOutcome {}));
         }
@@ -133,7 +133,7 @@ j5r6drg6k6zcqj0fcwg"
     let outputs = [(outgoing_out_point, outgoing_output)];
 
     fed.consensus_round(&[], &outputs).await;
-    match fed.output_outcome(outgoing_out_point).unwrap() {
+    match fed.output_outcome(outgoing_out_point).await.unwrap() {
         LightningOutputOutcome::Contract { outcome, .. } => {
             assert_eq!(
                 outcome,
@@ -237,7 +237,7 @@ async fn test_incoming() {
     let outputs = [(incoming_out_point, incoming_output)];
 
     fed.consensus_round(&[], &outputs).await;
-    match fed.output_outcome(incoming_out_point).unwrap() {
+    match fed.output_outcome(incoming_out_point).await.unwrap() {
         LightningOutputOutcome::Contract { outcome, .. } => {
             assert_eq!(
                 outcome,
@@ -259,7 +259,7 @@ async fn test_incoming() {
     );
 
     fed.consensus_round(&[], &[]).await;
-    match fed.output_outcome(incoming_out_point).unwrap() {
+    match fed.output_outcome(incoming_out_point).await.unwrap() {
         LightningOutputOutcome::Contract { outcome, .. } => {
             assert_eq!(
                 outcome,

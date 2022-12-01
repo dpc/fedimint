@@ -232,12 +232,12 @@ pub trait ServerModulePlugin: Debug + Sized {
     fn decoder(&self) -> Self::Decoder;
 
     /// Blocks until a new `consensus_proposal` is available.
-    async fn await_consensus_proposal<'a>(&'a self, dbtx: &DatabaseTransaction<'_>);
+    async fn await_consensus_proposal<'a>(&'a self, dbtx: &mut DatabaseTransaction<'_>);
 
     /// This module's contribution to the next consensus proposal
     async fn consensus_proposal<'a>(
         &'a self,
-        dbtx: &DatabaseTransaction<'_>,
+        dbtx: &mut DatabaseTransaction<'_>,
     ) -> Vec<Self::ConsensusItem>;
 
     /// This function is called once before transaction processing starts. All module consensus
@@ -290,9 +290,9 @@ pub trait ServerModulePlugin: Debug + Sized {
     /// function has no side effects and may be called at any time. False positives due to outdated
     /// database state are ok since they get filtered out after consensus has been reached on them
     /// and merely generate a warning.
-    fn validate_output(
+    async fn validate_output(
         &self,
-        dbtx: &DatabaseTransaction,
+        dbtx: &mut DatabaseTransaction<'_>,
         output: &Self::Output,
     ) -> Result<TransactionItemAmount, ModuleError>;
 
@@ -327,7 +327,7 @@ pub trait ServerModulePlugin: Debug + Sized {
     /// Retrieve the current status of the output. Depending on the module this might contain data
     /// needed by the client to access funds or give an estimate of when funds will be available.
     /// Returns `None` if the output is unknown, **NOT** if it is just not ready yet.
-    fn output_status(
+    async fn output_status(
         &self,
         dbtx: &mut DatabaseTransaction<'_>,
         out_point: OutPoint,

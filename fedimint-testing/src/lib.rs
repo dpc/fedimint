@@ -21,7 +21,7 @@ pub mod btc;
 
 #[derive(Debug)]
 pub struct FakeFed<Module> {
-    members: Vec<(PeerId, Module, Database)>,
+    pub members: Vec<(PeerId, Module, Database)>,
     client_cfg: ClientModuleConfig,
     block_height: Arc<std::sync::atomic::AtomicU64>,
 }
@@ -104,13 +104,17 @@ where
         assert_all_equal_result(results.into_iter())
     }
 
-    pub fn verify_output(&self, output: &Module::Output) -> bool {
-        let results = self.members.iter().map(|(_, member, db)| {
-            member
-                .validate_output(&db.begin_transaction(self.decoders()), output)
-                .is_err()
-        });
-        assert_all_equal(results)
+    pub async fn verify_output(&self, output: &Module::Output) -> bool {
+        let mut results = Vec::new();
+        for (_, member, db) in self.members.iter() {
+            results.push(
+                member
+                    .validate_output(&mut db.begin_transaction(self.decoders()), output)
+                    .await
+                    .is_err(),
+            );
+        }
+        assert_all_equal(results.into_iter())
     }
 
     fn decoders(&self) -> ModuleRegistry<Decoder> {
@@ -134,7 +138,7 @@ where
         for (id, member, db) in &mut self.members {
             consensus.extend(
                 member
-                    .consensus_proposal(&db.begin_transaction(decoders.clone()))
+                    .consensus_proposal(&mut db.begin_transaction(decoders.clone()))
                     .await
                     .into_iter()
                     .map(|ci| (*id, ci)),
@@ -175,14 +179,20 @@ where
         }
     }
 
-    pub fn output_outcome(&self, out_point: OutPoint) -> Option<Module::OutputOutcome> {
+    pub async fn output_outcome(&self, out_point: OutPoint) -> Option<Module::OutputOutcome> {
         // Since every member is in the same epoch they should have the same internal state, even
         // in terms of outcomes. This may change later once end_consensus_epoch is pulled out of the
         // main consensus loop into another thread to optimize latency. This test will probably fail
         // then.
-        assert_all_equal(self.members.iter().map(|(_, member, db)| {
-            member.output_status(&mut db.begin_transaction(self.decoders()), out_point)
-        }))
+        let mut results = Vec::new();
+        for (_, member, db) in self.members.iter() {
+            results.push(
+                member
+                    .output_status(&mut db.begin_transaction(self.decoders()), out_point)
+                    .await,
+            );
+        }
+        assert_all_equal(results.into_iter())
     }
 
     pub async fn patch_dbs<U>(&mut self, update: U)
@@ -247,7 +257,7 @@ where
     }
 }
 
-fn assert_all_equal<I>(mut iter: I) -> I::Item
+pub fn assert_all_equal<I>(mut iter: I) -> I::Item
 where
     I: Iterator,
     I::Item: Eq + Debug,

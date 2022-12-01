@@ -265,7 +265,7 @@ impl<T: AsRef<ClientConfig> + Clone> Client<T> {
     /// Fetches the client secret from the database or generates a new one if none is present
     async fn get_secret(db: &Database) -> DerivableSecret {
         let mut tx = db.begin_transaction(ModuleRegistry::default());
-        let client_secret = tx.get_value(&ClientSecretKey).expect("DB error");
+        let client_secret = tx.get_value(&ClientSecretKey).await.expect("DB error");
         let secret = if let Some(client_secret) = client_secret {
             client_secret
         } else {
@@ -294,7 +294,8 @@ impl<T: AsRef<ClientConfig> + Clone> Client<T> {
 
         let (peg_in_key, peg_in_proof) = self
             .wallet_client()
-            .create_pegin_input(txout_proof, btc_transaction)?;
+            .create_pegin_input(txout_proof, btc_transaction)
+            .await?;
 
         tx.input(
             &mut vec![peg_in_key],
@@ -606,6 +607,7 @@ impl Client<UserClientConfig> {
             .db
             .begin_transaction(ModuleRegistry::default())
             .get_value(&LightningGatewayKey)
+            .await
             .expect("DB error")
         {
             Ok(gateway)
@@ -708,6 +710,7 @@ impl Client<UserClientConfig> {
             .db
             .begin_transaction(ModuleRegistry::default())
             .get_value(&OutgoingPaymentKey(contract_id))
+            .await
             .expect("DB error")
             .ok_or(ClientError::RefundUnknownOutgoingContract)?;
 
@@ -866,7 +869,7 @@ impl Client<UserClientConfig> {
     ) -> Result<OutPoint> {
         // Lookup contract and "confirmed invoice"
         let contract = self.ln_client().get_incoming_contract(contract_id).await?;
-        let ci = self.ln_client().get_confirmed_invoice(contract_id)?;
+        let ci = self.ln_client().get_confirmed_invoice(contract_id).await?;
 
         // Input claims this contract
         let mut tx = TransactionBuilder::default();

@@ -154,9 +154,10 @@ impl<'c> MintClient<'c> {
             .collect()
     }
 
-    pub fn get_last_note_index(&self, dbtx: &mut DatabaseTransaction<'_>) -> NoteIndex {
+    pub async fn get_last_note_index(&self, dbtx: &mut DatabaseTransaction<'_>) -> NoteIndex {
         NoteIndex(
             dbtx.get_value(&LastECashNoteIndexKey)
+                .await
                 .expect("DB error")
                 .unwrap_or(0),
         )
@@ -166,7 +167,7 @@ impl<'c> MintClient<'c> {
         let mut new_idx;
         loop {
             let mut dbtx = self.start_dbtx();
-            new_idx = self.get_last_note_index(&mut dbtx).next();
+            new_idx = self.get_last_note_index(&mut dbtx).await.next();
             dbtx.insert_entry(&LastECashNoteIndexKey, &new_idx.as_u64())
                 .await
                 .expect("DB error");
@@ -263,6 +264,7 @@ impl<'c> MintClient<'c> {
             .db
             .begin_transaction(ModuleRegistry::default())
             .get_value(&OutputFinalizationKey(outpoint))
+            .await
             .expect("DB error")
             .ok_or(MintClientError::FinalizationError(
                 CoinFinalizationError::UnknownIssuance,
@@ -526,6 +528,8 @@ mod tests {
             &self,
             tx: TransactionId,
         ) -> crate::api::Result<TransactionStatus> {
+            // TODO: output_outcome is not Send
+            /*
             let mint = self.mint.lock().await;
             Ok(TransactionStatus::Accepted {
                 epoch: 0,
@@ -535,10 +539,13 @@ mod tests {
                             txid: tx,
                             out_idx: 0,
                         })
+                        .await
                         .unwrap()
                         .into()),
                 )],
             })
+            */
+            todo!()
         }
 
         async fn submit_transaction(
@@ -847,6 +854,7 @@ mod tests {
             .db
             .begin_transaction(ModuleRegistry::default())
             .get_value(&LastECashNoteIndexKey)
+            .await
             .expect("DB error")
             .unwrap_or(0);
         // Ensure we didn't skip any keys

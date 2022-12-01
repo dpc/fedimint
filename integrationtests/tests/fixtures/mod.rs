@@ -628,6 +628,7 @@ impl FederationTest {
             .client
             .wallet_client()
             .create_pegin_input(txout_proof, btc_transaction)
+            .await
             .unwrap();
 
         for server in &self.servers {
@@ -732,11 +733,13 @@ impl FederationTest {
     /// If the epoch has empty proposals (no new information) then panic
     pub async fn run_consensus_epochs(&self, epochs: usize) {
         for _ in 0..(epochs) {
-            if self
-                .servers
-                .iter()
-                .all(|s| Self::empty_proposal(&s.borrow().fedimint))
-            {
+            let mut empty_proposal = true;
+            for serv in self.servers.iter() {
+                empty_proposal =
+                    empty_proposal && Self::empty_proposal(&serv.borrow().fedimint).await;
+            }
+
+            if empty_proposal {
                 panic!("Empty proposals, fed might wait forever");
             }
 
@@ -764,7 +767,7 @@ impl FederationTest {
     }
 
     /// Returns true if the fed would produce an empty epoch proposal (no new information)
-    fn empty_proposal(server: &FedimintServer) -> bool {
+    async fn empty_proposal(server: &FedimintServer) -> bool {
         let height = server
             .consensus
             .modules
@@ -773,7 +776,8 @@ impl FederationTest {
             .as_any()
             .downcast_ref::<Wallet>()
             .unwrap()
-            .consensus_height(&server.consensus.db.begin_transaction(all_decoders()))
+            .consensus_height(&mut server.consensus.db.begin_transaction(all_decoders()))
+            .await
             .unwrap_or(0);
         let proposal = block_on(server.consensus.get_consensus_proposal());
 
