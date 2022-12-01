@@ -71,8 +71,10 @@ impl<'a> IDatabaseTransaction<'a> for RocksDbTransaction<'a> {
         Ok(val)
     }
 
-    async fn raw_get_bytes(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        Ok(self.0.snapshot().get(key)?)
+    async fn raw_get_bytes(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+        //let snap = self.0.snapshot();
+        //Ok(self.0.snapshot().get(key)?)
+        todo!()
     }
 
     async fn raw_remove_entry(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
@@ -126,7 +128,7 @@ impl IDatabaseTransaction<'_> for RocksDbReadOnly {
         panic!("Cannot insert into a read only transaction");
     }
 
-    async fn raw_get_bytes(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+    async fn raw_get_bytes(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         Ok(self.0.get(key)?)
     }
 

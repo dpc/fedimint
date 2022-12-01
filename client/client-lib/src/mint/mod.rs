@@ -528,24 +528,21 @@ mod tests {
             &self,
             tx: TransactionId,
         ) -> crate::api::Result<TransactionStatus> {
-            // TODO: output_outcome is not Send
-            /*
             let mint = self.mint.lock().await;
+            // FIXME: Need to block on this future because output_outcome is not send
+            let output_outcome = futures::executor::block_on(async {
+                mint.output_outcome(OutPoint {
+                    txid: tx,
+                    out_idx: 0,
+                })
+                .await
+                .unwrap()
+            });
+
             Ok(TransactionStatus::Accepted {
                 epoch: 0,
-                outputs: vec![SerdeOutputOutcome::from(
-                    &(mint
-                        .output_outcome(OutPoint {
-                            txid: tx,
-                            out_idx: 0,
-                        })
-                        .await
-                        .unwrap()
-                        .into()),
-                )],
+                outputs: vec![SerdeOutputOutcome::from(&(output_outcome.into()))],
             })
-            */
-            todo!()
         }
 
         async fn submit_transaction(

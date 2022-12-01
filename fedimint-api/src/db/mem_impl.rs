@@ -80,7 +80,7 @@ impl<'a> IDatabaseTransaction<'a> for MemTransaction<'a> {
         val
     }
 
-    async fn raw_get_bytes(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+    async fn raw_get_bytes(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         Ok(self.tx_data.get(key).cloned())
     }
 

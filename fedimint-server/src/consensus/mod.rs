@@ -392,24 +392,24 @@ impl FedimintConsensus {
             .expect("DB Error");
     }
 
-    pub async fn await_consensus_proposal(&self) {
-        // TODO: FIXME
+    pub async fn await_consensus_proposal(&self, dbtx: &mut DatabaseTransaction<'_>) {
         /*
-        let mut proposal_futures = Vec::new();
-        for (_, module) in self.modules.iter() {
-            proposal_futures.push(module.await_consensus_proposal(&mut dbtx));
-        }
-        let mut dbtx = self.database_transaction();
         let proposal_futures = self
             .modules
             .iter()
             .map(|(_, module)| {
-                module.await_consensus_proposal(&mut dbtx)
+                //let mut dbtx = self.database_transaction();
+                module.await_consensus_proposal(dbtx)
             })
             .collect::<Vec<_>>();
 
         select_all(proposal_futures).await;
-            */
+        */
+        let mut futures = Vec::new();
+        for (_, module) in self.modules.iter() {
+            //let mut dbtx = self.database_transaction();
+            futures.push(module.await_consensus_proposal(dbtx));
+        }
     }
 
     pub async fn get_consensus_proposal(&self) -> ConsensusProposal {
