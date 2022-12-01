@@ -428,9 +428,15 @@ mod tests {
         fedimint_api::task::sleep(Duration::from_secs(12)).await;
         assert!(btc_rpc.is_btc_sent_to(amount, addr).await);
 
-        let wallet_value = fed.lock().await.fetch_from_all(|wallet, db| {
-            wallet.get_wallet_value(&db.begin_transaction(ModuleRegistry::default()))
-        });
+        let mut results = Vec::new();
+        for (_, member, db) in fed.lock().await.members.iter_mut() {
+            results.push(
+                member
+                    .get_wallet_value(&mut db.begin_transaction(ModuleRegistry::default()))
+                    .await,
+            );
+        }
+        let wallet_value = fedimint_testing::assert_all_equal(results.into_iter());
         assert_eq!(wallet_value, bitcoin::Amount::from_sat(0));
 
         // test change recognition, wallet should hold some sats
@@ -438,9 +444,15 @@ mod tests {
         btc_rpc.set_block_height(301).await;
         fed.lock().await.consensus_round(&[], &[]).await;
 
-        let wallet_value = fed.lock().await.fetch_from_all(|wallet, db| {
-            wallet.get_wallet_value(&db.begin_transaction(ModuleRegistry::default()))
-        });
+        let mut results = Vec::new();
+        for (_, member, db) in fed.lock().await.members.iter_mut() {
+            results.push(
+                member
+                    .get_wallet_value(&mut db.begin_transaction(ModuleRegistry::default()))
+                    .await,
+            );
+        }
+        let wallet_value = fedimint_testing::assert_all_equal(results.into_iter());
         assert!(wallet_value > bitcoin::Amount::from_sat(0));
     }
 }

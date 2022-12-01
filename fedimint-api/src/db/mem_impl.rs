@@ -95,7 +95,7 @@ impl<'a> IDatabaseTransaction<'a> for MemTransaction<'a> {
         Ok(ret)
     }
 
-    fn raw_find_by_prefix(&self, key_prefix: &[u8]) -> PrefixIter<'_> {
+    async fn raw_find_by_prefix(&mut self, key_prefix: &[u8]) -> PrefixIter<'_> {
         let mut data = self
             .tx_data
             .range::<Vec<u8>, _>((key_prefix.to_vec())..)

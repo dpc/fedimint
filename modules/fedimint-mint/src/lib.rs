@@ -317,6 +317,7 @@ impl ServerModulePlugin for Mint {
         dbtx: &mut DatabaseTransaction<'_>,
     ) -> Vec<Self::ConsensusItem> {
         dbtx.find_by_prefix(&ProposedPartialSignaturesKeyPrefix)
+            .await
             .map(|res| {
                 let (key, partial_signature) = res.expect("DB error");
                 MintConsensusItem(PartiallySignedRequest {
@@ -494,6 +495,7 @@ impl ServerModulePlugin for Mint {
         // Finalize partial signatures for which we now have enough shares
         let issuance_requests_iter = dbtx
             .find_by_prefix(&ReceivedPartialSignaturesKeyPrefix)
+            .await
             .map(|entry_res| {
                 let (key, partial_sig) = entry_res.expect("DB error");
                 (key.request_id, (key.peer_id, partial_sig))
@@ -572,6 +574,7 @@ impl ServerModulePlugin for Mint {
         let mut issuances = Amount::from_sat(0);
         let remove_audit_keys = dbtx
             .find_by_prefix(&MintAuditItemKeyPrefix)
+            .await
             .map(|res| {
                 let (key, amount) = res.expect("DB error");
                 match key {
@@ -612,6 +615,7 @@ impl ServerModulePlugin for Mint {
             .find_by_prefix(&ReceivedPartialSignatureKeyOutputPrefix {
                 request_id: out_point,
             })
+            .await
             .any(|res| res.is_ok());
 
         let final_sig = dbtx
@@ -628,13 +632,15 @@ impl ServerModulePlugin for Mint {
         }
     }
 
-    fn audit(&self, dbtx: &DatabaseTransaction<'_>, audit: &mut Audit) {
-        audit.add_items(dbtx, &MintAuditItemKeyPrefix, |k, v| match k {
-            MintAuditItemKey::Issuance(_) => -(v.milli_sat as i64),
-            MintAuditItemKey::IssuanceTotal => -(v.milli_sat as i64),
-            MintAuditItemKey::Redemption(_) => v.milli_sat as i64,
-            MintAuditItemKey::RedemptionTotal => v.milli_sat as i64,
-        });
+    async fn audit(&self, dbtx: &mut DatabaseTransaction<'_>, audit: &mut Audit) {
+        audit
+            .add_items(dbtx, &MintAuditItemKeyPrefix, |k, v| match k {
+                MintAuditItemKey::Issuance(_) => -(v.milli_sat as i64),
+                MintAuditItemKey::IssuanceTotal => -(v.milli_sat as i64),
+                MintAuditItemKey::Redemption(_) => v.milli_sat as i64,
+                MintAuditItemKey::RedemptionTotal => v.milli_sat as i64,
+            })
+            .await;
     }
 
     fn api_base_name(&self) -> &'static str {

@@ -337,7 +337,7 @@ pub trait ServerModulePlugin: Debug + Sized {
     ///
     /// Summing over all modules, if liabilities > assets then an error has occurred in the database
     /// and consensus should halt.
-    fn audit(&self, dbtx: &DatabaseTransaction<'_>, audit: &mut Audit);
+    async fn audit(&self, dbtx: &mut DatabaseTransaction<'_>, audit: &mut Audit);
 
     /// Defines the prefix for API endpoints defined by the module.
     ///

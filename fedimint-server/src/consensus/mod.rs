@@ -318,7 +318,7 @@ impl FedimintConsensus {
             dbtx.commit_tx().await.expect("DB Error");
         }
 
-        let audit = self.audit();
+        let audit = self.audit().await;
         if audit.sum().milli_sat < 0 {
             panic!(
                 "Balance sheet of the fed has gone negative, this should never happen! {}",
@@ -406,6 +406,7 @@ impl FedimintConsensus {
 
         let drop_peers = dbtx
             .find_by_prefix(&DropPeerKeyPrefix)
+            .await
             .map(|res| {
                 let key = res.expect("DB error").0;
                 key.0
@@ -414,6 +415,7 @@ impl FedimintConsensus {
 
         let mut items: Vec<ConsensusItem> = dbtx
             .find_by_prefix(&ProposedTransactionKeyPrefix)
+            .await
             .map(|res| {
                 let (_key, value) = res.expect("DB error");
                 ConsensusItem::Transaction(value)
@@ -566,11 +568,11 @@ impl FedimintConsensus {
         VerificationCaches { caches }
     }
 
-    pub fn audit(&self) -> Audit {
-        let dbtx = self.database_transaction();
+    pub async fn audit(&self) -> Audit {
+        let mut dbtx = self.database_transaction();
         let mut audit = Audit::default();
         for module in self.modules.values() {
-            module.audit(&dbtx, &mut audit)
+            module.audit(&mut dbtx, &mut audit).await
         }
         audit
     }

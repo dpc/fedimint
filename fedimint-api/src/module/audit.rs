@@ -20,13 +20,18 @@ impl Audit {
         }
     }
 
-    pub fn add_items<KP, F>(&mut self, dbtx: &DatabaseTransaction, key_prefix: &KP, to_milli_sat: F)
-    where
+    pub async fn add_items<KP, F>(
+        &mut self,
+        dbtx: &mut DatabaseTransaction<'_>,
+        key_prefix: &KP,
+        to_milli_sat: F,
+    ) where
         KP: DatabaseKeyPrefix + DatabaseKeyPrefixConst + 'static,
         F: Fn(KP::Key, KP::Value) -> i64,
     {
         let mut new_items = dbtx
             .find_by_prefix(key_prefix)
+            .await
             .map(|res| {
                 let (key, value) = res.expect("DB error");
                 let name = format!("{:?}", key);

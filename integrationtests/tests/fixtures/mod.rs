@@ -453,9 +453,10 @@ impl<T: AsRef<ClientConfig> + Clone> UserTest<T> {
     }
 
     /// Returns the amount denominations of all coins from lowest to highest
-    pub fn coin_amounts(&self) -> Vec<Amount> {
+    pub async fn coin_amounts(&self) -> Vec<Amount> {
         self.client
             .coins()
+            .await
             .iter_tiers()
             .flat_map(|(a, c)| repeat(*a).take(c.len()))
             .sorted()
@@ -463,17 +464,17 @@ impl<T: AsRef<ClientConfig> + Clone> UserTest<T> {
     }
 
     /// Returns sum total of all coins
-    pub fn total_coins(&self) -> Amount {
-        self.client.coins().total_amount()
+    pub async fn total_coins(&self) -> Amount {
+        self.client.coins().await.total_amount()
     }
 
     pub async fn assert_total_coins(&self, amount: Amount) {
         self.client.fetch_all_coins().await;
-        assert_eq!(self.total_coins(), amount);
+        assert_eq!(self.total_coins().await, amount);
     }
     pub async fn assert_coin_amounts(&self, amounts: Vec<Amount>) {
         self.client.fetch_all_coins().await;
-        assert_eq!(self.coin_amounts(), amounts);
+        assert_eq!(self.coin_amounts().await, amounts);
     }
 }
 
@@ -576,7 +577,12 @@ impl FederationTest {
         user: &UserTest<C>,
         amount: Amount,
     ) -> TieredMulti<SpendableNote> {
-        let coins = user.client.mint_client().select_coins(amount).unwrap();
+        let coins = user
+            .client
+            .mint_client()
+            .select_coins(amount)
+            .await
+            .unwrap();
         if coins.total_amount() == amount {
             return user.client.spend_ecash(amount, rng()).await.unwrap();
         }
@@ -761,7 +767,7 @@ impl FederationTest {
             {
                 maybe_cancelled?;
             }
-            self.update_last_consensus();
+            self.update_last_consensus().await;
         }
         Ok(())
     }
@@ -822,7 +828,7 @@ impl FederationTest {
 
             res.0?;
         }
-        self.update_last_consensus();
+        self.update_last_consensus().await;
         Ok(())
     }
 
@@ -860,7 +866,7 @@ impl FederationTest {
         Ok(())
     }
 
-    fn update_last_consensus(&self) {
+    async fn update_last_consensus(&self) {
         let new_consensus = self
             .servers
             .iter()
@@ -875,7 +881,8 @@ impl FederationTest {
             .borrow()
             .fedimint
             .consensus
-            .audit();
+            .audit()
+            .await;
 
         if last_consensus.is_empty() || last_consensus.epoch < new_consensus.epoch {
             info!("{}", consensus::debug::epoch_message(&new_consensus));

@@ -123,7 +123,7 @@ impl<'a> IDatabaseTransaction<'a> for SledTransaction<'a> {
         ret
     }
 
-    fn raw_find_by_prefix(&self, key_prefix: &[u8]) -> PrefixIter<'_> {
+    async fn raw_find_by_prefix(&mut self, key_prefix: &[u8]) -> PrefixIter<'_> {
         let mut val = BTreeMap::new();
         // First iterate through pending writes to support "read our own writes"
         for op in &self.operations {

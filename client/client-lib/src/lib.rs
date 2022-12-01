@@ -370,7 +370,8 @@ impl<T: AsRef<ClientConfig> + Clone> Client<T> {
 
         let input_coins = self
             .mint_client()
-            .select_coins(blind_nonces.total_amount())?;
+            .select_coins(blind_nonces.total_amount())
+            .await?;
         tx.input_coins(input_coins)?;
         tx.output(Output::Mint(MintOutput(blind_nonces)));
         let txid = self.submit_tx_with_change(tx, &mut rng).await?;
@@ -428,7 +429,7 @@ impl<T: AsRef<ClientConfig> + Clone> Client<T> {
             .fee_consensus
             .peg_out_abs
             + (peg_out.amount + peg_out.fees.amount()).into();
-        let coins = self.mint_client().select_coins(funding_amount)?;
+        let coins = self.mint_client().select_coins(funding_amount).await?;
         tx.input_coins(coins)?;
         let peg_out_idx = tx.output(Output::Wallet(WalletOutput(peg_out)));
 
@@ -467,7 +468,7 @@ impl<T: AsRef<ClientConfig> + Clone> Client<T> {
         amount: Amount,
         rng: R,
     ) -> Result<TieredMulti<SpendableNote>> {
-        let coins = self.mint_client().select_coins(amount)?;
+        let coins = self.mint_client().select_coins(amount).await?;
 
         let final_coins = if coins.total_amount() == amount {
             coins
@@ -484,7 +485,7 @@ impl<T: AsRef<ClientConfig> + Clone> Client<T> {
 
             self.submit_tx_with_change(tx, rng).await?;
             self.fetch_all_coins().await;
-            self.mint_client().select_coins(amount)?
+            self.mint_client().select_coins(amount).await?
         };
         assert_eq!(
             final_coins.total_amount(),
@@ -519,9 +520,10 @@ impl<T: AsRef<ClientConfig> + Clone> Client<T> {
     /// Should be called after any transaction that might have failed in order to get any coin
     /// inputs back.
     pub async fn reissue_pending_coins<R: RngCore + CryptoRng>(&self, rng: R) -> Result<OutPoint> {
-        let dbtx = self.context.db.begin_transaction(ModuleRegistry::default());
+        let mut dbtx = self.context.db.begin_transaction(ModuleRegistry::default());
         let pending = dbtx
             .find_by_prefix(&PendingCoinsKeyPrefix)
+            .await
             .map(|res| res.expect("DB error"));
 
         let stream = pending
@@ -576,12 +578,12 @@ impl<T: AsRef<ClientConfig> + Clone> Client<T> {
             .collect()
     }
 
-    pub fn coins(&self) -> TieredMulti<SpendableNote> {
-        self.mint_client().coins()
+    pub async fn coins(&self) -> TieredMulti<SpendableNote> {
+        self.mint_client().coins().await
     }
 
-    pub fn list_active_issuances(&self) -> Vec<(OutPoint, NoteIssuanceRequests)> {
-        self.mint_client().list_active_issuances()
+    pub async fn list_active_issuances(&self) -> Vec<(OutPoint, NoteIssuanceRequests)> {
+        self.mint_client().list_active_issuances().await
     }
 
     pub async fn fetch_epoch_history(
@@ -686,7 +688,7 @@ impl Client<UserClientConfig> {
             } // FIXME: impl TryFrom
         };
 
-        let coins = self.mint_client().select_coins(amount)?;
+        let coins = self.mint_client().select_coins(amount).await?;
         tx.input_coins(coins)?;
         tx.output(Output::LN(contract));
         let txid = self.submit_tx_with_change(tx, &mut rng).await?;
@@ -1010,11 +1012,12 @@ impl Client<GatewayClientConfig> {
     }
 
     /// Lists all previously saved transactions that have not been driven to completion so far
-    pub fn list_pending_outgoing(&self) -> Vec<OutgoingContractAccount> {
+    pub async fn list_pending_outgoing(&self) -> Vec<OutgoingContractAccount> {
         self.context
             .db
             .begin_transaction(ModuleRegistry::default())
             .find_by_prefix(&OutgoingContractAccountKeyPrefix)
+            .await
             .map(|res| res.expect("DB error").1)
             .collect()
     }
@@ -1106,7 +1109,7 @@ impl Client<GatewayClientConfig> {
 
         // Inputs
         let mut builder = TransactionBuilder::default();
-        let coins = self.mint_client().select_coins(offer.amount)?;
+        let coins = self.mint_client().select_coins(offer.amount).await?;
         builder.input_coins(coins)?;
 
         // Outputs
@@ -1154,11 +1157,12 @@ impl Client<GatewayClientConfig> {
 
     /// Lists all claim transactions for outgoing contracts that we have submitted but were not part
     /// of the consensus yet.
-    pub fn list_pending_claimed_outgoing(&self) -> Vec<ContractId> {
+    pub async fn list_pending_claimed_outgoing(&self) -> Vec<ContractId> {
         self.context
             .db
             .begin_transaction(ModuleRegistry::default())
             .find_by_prefix(&OutgoingPaymentClaimKeyPrefix)
+            .await
             .map(|res| res.expect("DB error").0 .0)
             .collect()
     }
@@ -1197,9 +1201,10 @@ impl Client<GatewayClientConfig> {
         Ok(())
     }
 
-    pub fn list_fetchable_coins(&self) -> Vec<OutPoint> {
+    pub async fn list_fetchable_coins(&self) -> Vec<OutPoint> {
         self.mint_client()
             .list_active_issuances()
+            .await
             .into_iter()
             .map(|(outpoint, _)| outpoint)
             .collect()

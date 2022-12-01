@@ -196,8 +196,8 @@ async fn ecash_can_be_exchanged_directly_between_users() -> Result<()> {
     ));
 
     fed.mine_and_mint(&user_send, &*bitcoin, sats(5000)).await;
-    assert_eq!(user_send.total_coins(), sats(5000));
-    assert_eq!(user_receive.total_coins(), sats(0));
+    assert_eq!(user_send.total_coins().await, sats(5000));
+    assert_eq!(user_receive.total_coins().await, sats(0));
 
     let ecash = fed.spend_ecash(&user_send, sats(3500)).await;
     user_receive.client.reissue(ecash, rng()).await.unwrap();
@@ -237,7 +237,10 @@ async fn ecash_cannot_double_spent_with_different_nodes() -> Result<()> {
     let res2 = user2.client.fetch_coins(out2).await;
     let res3 = user3.client.fetch_coins(out3).await;
     assert!(res2.is_err() || res3.is_err()); //no double spend
-    assert_eq!(user2.total_coins() + user3.total_coins(), sats(2000));
+    assert_eq!(
+        user2.total_coins().await + user3.total_coins().await,
+        sats(2000)
+    );
     assert_eq!(fed.max_balance_sheet(), 0);
 
     task_group.shutdown_join_all().await
@@ -264,7 +267,7 @@ async fn ecash_in_wallet_can_sent_through_a_tx() -> Result<()> {
 
     fed.mine_and_mint(&user_send, &*bitcoin, sats(1100)).await;
     assert_eq!(
-        user_send.coin_amounts(),
+        user_send.coin_amounts().await,
         vec![sats(100), sats(500), sats(500)]
     );
 
@@ -726,8 +729,8 @@ async fn receive_lightning_payment_valid_preimage() -> Result<()> {
     } = fixtures(2, &[sats(1000), sats(100)]).await?;
     fed.mine_and_mint(&gateway.user, &*bitcoin, starting_balance)
         .await;
-    assert_eq!(user.total_coins(), sats(0));
-    assert_eq!(gateway.user.total_coins(), starting_balance);
+    assert_eq!(user.total_coins().await, sats(0));
+    assert_eq!(gateway.user.total_coins().await, starting_balance);
 
     // Create lightning invoice whose associated "offer" is accepted by federation consensus
     let invoice = tokio::join!(
@@ -802,8 +805,8 @@ async fn receive_lightning_payment_invalid_preimage() -> Result<()> {
     } = fixtures(2, &[sats(1000), sats(100)]).await?;
     fed.mine_and_mint(&gateway.user, &*bitcoin, starting_balance)
         .await;
-    assert_eq!(user.total_coins(), sats(0));
-    assert_eq!(gateway.user.total_coins(), starting_balance);
+    assert_eq!(user.total_coins().await, sats(0));
+    assert_eq!(gateway.user.total_coins().await, starting_balance);
 
     // Manually construct offer where sha256(preimage) != hash
     let kp = KeyPair::new(&secp(), &mut rng());
@@ -972,7 +975,7 @@ async fn lightning_gateway_can_abort_payment_to_return_user_funds() -> Result<()
         .unwrap();
     fed.run_consensus_epochs(2).await;
     user.client.fetch_coins(outpoint).await.unwrap();
-    assert_eq!(user.total_coins(), sats(1010));
+    assert_eq!(user.total_coins().await, sats(1010));
     assert_eq!(fed.max_balance_sheet(), 0);
 
     task_group.shutdown_join_all().await

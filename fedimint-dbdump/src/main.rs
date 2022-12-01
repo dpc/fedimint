@@ -29,7 +29,7 @@ macro_rules! filter_prefixes {
 
 macro_rules! push_db_pair_items {
     ($self:ident, $prefix_type:expr, $key_type:ty, $value_type:ty, $map:ident, $key_literal:literal) => {
-        let db_items = $self.read_only.find_by_prefix(&$prefix_type);
+        let db_items = $self.read_only.find_by_prefix(&$prefix_type).await;
         let mut items: Vec<($key_type, $value_type)> = Vec::new();
         for item in db_items {
             items.push(item.unwrap());
@@ -52,7 +52,7 @@ impl SerdeWrapper {
 
 macro_rules! push_db_pair_items_no_serde {
     ($self:ident, $prefix_type:expr, $key_type:ty, $value_type:ty, $map:ident, $key_literal:literal) => {
-        let db_items = $self.read_only.find_by_prefix(&$prefix_type);
+        let db_items = $self.read_only.find_by_prefix(&$prefix_type).await;
         let mut items: Vec<($key_type, SerdeWrapper)> = Vec::new();
         for item in db_items {
             let (k, v) = item.unwrap();
@@ -64,7 +64,7 @@ macro_rules! push_db_pair_items_no_serde {
 
 macro_rules! push_db_key_items {
     ($self:ident, $prefix_type:expr, $key_type:ty, $map:ident, $key_literal:literal) => {
-        let db_items = $self.read_only.find_by_prefix(&$prefix_type);
+        let db_items = $self.read_only.find_by_prefix(&$prefix_type).await;
         let mut items: Vec<$key_type> = Vec::new();
         for item in db_items {
             items.push(item.unwrap().0);
@@ -99,22 +99,22 @@ impl<'a> DatabaseDump<'a> {
                     self.get_consensus_data().await;
                 }
                 "mint" => {
-                    self.get_mint_data();
+                    self.get_mint_data().await;
                 }
                 "wallet" => {
                     self.get_wallet_data().await;
                 }
                 "lightning" => {
-                    self.get_lightning_data();
+                    self.get_lightning_data().await;
                 }
                 "mintclient" => {
                     self.get_mint_client_data().await;
                 }
                 "lightningclient" => {
-                    self.get_ln_client_data();
+                    self.get_ln_client_data().await;
                 }
                 "walletclient" => {
-                    self.get_wallet_client_data();
+                    self.get_wallet_client_data().await;
                 }
                 "client" => {
                     self.get_client_data().await;
@@ -203,7 +203,7 @@ impl<'a> DatabaseDump<'a> {
 
     /// Iterates through each of the prefixes within the mint range and retrieves
     /// the corresponding data.
-    fn get_mint_data(&mut self) {
+    async fn get_mint_data(&mut self) {
         let mut mint: BTreeMap<String, Box<dyn Serialize>> = BTreeMap::new();
         for table in MintRange::DbKeyPrefix::iter() {
             filter_prefixes!(table, self);
@@ -360,7 +360,7 @@ impl<'a> DatabaseDump<'a> {
 
     /// Iterates through each of the prefixes within the lightning range and retrieves
     /// the corresponding data.
-    fn get_lightning_data(&mut self) {
+    async fn get_lightning_data(&mut self) {
         let mut lightning: BTreeMap<String, Box<dyn Serialize>> = BTreeMap::new();
         for table in LightningRange::DbKeyPrefix::iter() {
             filter_prefixes!(table, self);
@@ -435,7 +435,7 @@ impl<'a> DatabaseDump<'a> {
 
     /// Iterates through each of the prefixes within the lightning client range and retrieves
     /// the corresponding data.
-    fn get_ln_client_data(&mut self) {
+    async fn get_ln_client_data(&mut self) {
         let mut ln_client: BTreeMap<String, Box<dyn Serialize>> = BTreeMap::new();
         for table in ClientLightningRange::DbKeyPrefix::iter() {
             filter_prefixes!(table, self);
@@ -557,7 +557,7 @@ impl<'a> DatabaseDump<'a> {
 
     /// Iterates through each of the prefixes within the wallet client range and retrieves
     /// the corresponding data.
-    fn get_wallet_client_data(&mut self) {
+    async fn get_wallet_client_data(&mut self) {
         let mut wallet_client: BTreeMap<String, Box<dyn Serialize>> = BTreeMap::new();
         for table in ClientWalletRange::DbKeyPrefix::iter() {
             filter_prefixes!(table, self);

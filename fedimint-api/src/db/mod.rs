@@ -107,7 +107,7 @@ pub trait IDatabaseTransaction<'a>: 'a + Send {
 
     async fn raw_remove_entry(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>>;
 
-    fn raw_find_by_prefix(&self, key_prefix: &[u8]) -> PrefixIter<'_>;
+    async fn raw_find_by_prefix(&mut self, key_prefix: &[u8]) -> PrefixIter<'_>;
 
     async fn commit_tx(self: Box<Self>) -> Result<()>;
 
@@ -232,27 +232,29 @@ impl<'a> DatabaseTransaction<'a> {
         Ok(Some(K::Value::from_bytes(&value_bytes, &self.1)?))
     }
 
-    pub fn find_by_prefix<KP>(
-        &self,
+    pub async fn find_by_prefix<KP>(
+        &mut self,
         key_prefix: &KP,
     ) -> impl Iterator<Item = Result<(KP::Key, KP::Value)>> + '_
     where
         KP: DatabaseKeyPrefix + DatabaseKeyPrefixConst,
     {
-        let decoders = &self.1;
+        let decoders = self.1.clone();
         let prefix_bytes = key_prefix.to_bytes();
-        self.raw_find_by_prefix(&prefix_bytes).map(|res| {
-            res.and_then(|(key_bytes, value_bytes)| {
-                let key = KP::Key::from_bytes(&key_bytes, decoders)?;
-                trace!(
-                    "find by prefix: Decoding {} from bytes {:?}",
-                    std::any::type_name::<KP::Value>(),
-                    value_bytes
-                );
-                let value = KP::Value::from_bytes(&value_bytes, decoders)?;
-                Ok((key, value))
+        self.raw_find_by_prefix(&prefix_bytes)
+            .await
+            .map(move |res| {
+                res.and_then(|(key_bytes, value_bytes)| {
+                    let key = KP::Key::from_bytes(&key_bytes, &decoders)?;
+                    trace!(
+                        "find by prefix: Decoding {} from bytes {:?}",
+                        std::any::type_name::<KP::Value>(),
+                        value_bytes
+                    );
+                    let value = KP::Value::from_bytes(&value_bytes, &decoders)?;
+                    Ok((key, value))
+                })
             })
-        })
     }
 }
 
@@ -484,10 +486,10 @@ mod tests {
         dbtx.commit_tx().await.expect("DB Error");
 
         // Verify finding by prefix returns the correct set of key pairs
-        let dbtx = db.begin_transaction(ModuleRegistry::default());
+        let mut dbtx = db.begin_transaction(ModuleRegistry::default());
         let mut returned_keys = 0;
         let expected_keys = 2;
-        for res in dbtx.find_by_prefix(&DbPrefixTestPrefix) {
+        for res in dbtx.find_by_prefix(&DbPrefixTestPrefix).await {
             match res.as_ref().unwrap().0 {
                 TestKey(55) => {
                     assert!(res.unwrap().1.eq(&TestVal(9999)));
@@ -507,7 +509,7 @@ mod tests {
 
         let mut returned_keys = 0;
         let expected_keys = 2;
-        for res in dbtx.find_by_prefix(&AltDbPrefixTestPrefix) {
+        for res in dbtx.find_by_prefix(&AltDbPrefixTestPrefix).await {
             match res.as_ref().unwrap().0 {
                 AltTestKey(55) => {
                     assert!(res.unwrap().1.eq(&TestVal(7777)));
@@ -599,7 +601,7 @@ mod tests {
 
         let mut returned_keys = 0;
         let expected_keys = 0;
-        for res in dbtx.find_by_prefix(&DbPrefixTestPrefix) {
+        for res in dbtx.find_by_prefix(&DbPrefixTestPrefix).await {
             match res.as_ref().unwrap().0 {
                 TestKey(100) => {
                     assert!(res.unwrap().1.eq(&TestVal(101)));
@@ -629,10 +631,10 @@ mod tests {
 
         dbtx.commit_tx().await.expect("DB Error");
 
-        let dbtx = db.begin_transaction(ModuleRegistry::default());
+        let mut dbtx = db.begin_transaction(ModuleRegistry::default());
         let mut returned_keys = 0;
         let expected_keys = 2;
-        for res in dbtx.find_by_prefix(&DbPrefixTestPrefix) {
+        for res in dbtx.find_by_prefix(&DbPrefixTestPrefix).await {
             match res.as_ref().unwrap().0 {
                 TestKey(100) => {
                     assert!(res.unwrap().1.eq(&TestVal(101)));
@@ -660,7 +662,7 @@ mod tests {
         dbtx2.commit_tx().await.expect("DB Error");
 
         let mut returned_keys = 0;
-        for res in dbtx.find_by_prefix(&DbPrefixTestPrefix) {
+        for res in dbtx.find_by_prefix(&DbPrefixTestPrefix).await {
             match res.as_ref().unwrap().0 {
                 TestKey(100) => {
                     assert!(res.unwrap().1.eq(&TestVal(101)));

@@ -131,9 +131,10 @@ impl<'c> MintClient<'c> {
         self.context.db.begin_transaction(ModuleRegistry::default())
     }
 
-    pub fn coins(&self) -> TieredMulti<SpendableNote> {
+    pub async fn coins(&self) -> TieredMulti<SpendableNote> {
         self.start_dbtx()
             .find_by_prefix(&CoinKeyPrefix)
+            .await
             .map(|res| {
                 let (key, spendable_coin) = res.expect("DB error");
                 (key.amount, spendable_coin)
@@ -142,11 +143,12 @@ impl<'c> MintClient<'c> {
     }
 
     /// Get available spendable notes with a db transaction already opened
-    pub fn get_available_notes(
+    pub async fn get_available_notes(
         &self,
         dbtx: &mut DatabaseTransaction<'_>,
     ) -> TieredMulti<SpendableNote> {
         dbtx.find_by_prefix(&CoinKeyPrefix)
+            .await
             .map(|res| {
                 let (key, spendable_coin) = res.expect("DB error");
                 (key.amount, spendable_coin)
@@ -189,9 +191,10 @@ impl<'c> MintClient<'c> {
         NoteIssuanceRequest::new(ctx, secret)
     }
 
-    pub fn select_coins(&self, amount: Amount) -> Result<TieredMulti<SpendableNote>> {
+    pub async fn select_coins(&self, amount: Amount) -> Result<TieredMulti<SpendableNote>> {
         let coins = self
             .coins()
+            .await
             .select_coins(amount)
             .ok_or(MintClientError::NotEnoughCoins)?;
 
@@ -296,11 +299,12 @@ impl<'c> MintClient<'c> {
         Ok(())
     }
 
-    pub fn list_active_issuances(&self) -> Vec<(OutPoint, NoteIssuanceRequests)> {
+    pub async fn list_active_issuances(&self) -> Vec<(OutPoint, NoteIssuanceRequests)> {
         self.context
             .db
             .begin_transaction(ModuleRegistry::default())
             .find_by_prefix(&OutputFinalizationKeyPrefix)
+            .await
             .map(|res| {
                 let (OutputFinalizationKey(outpoint), cfd) = res.expect("DB error");
                 (outpoint, cfd)
@@ -309,7 +313,7 @@ impl<'c> MintClient<'c> {
     }
 
     pub async fn fetch_all_coins(&self) -> Vec<Result<OutPoint>> {
-        let active_issuances = self.list_active_issuances();
+        let active_issuances = self.list_active_issuances().await;
         if active_issuances.is_empty() {
             return Vec::new();
         }
@@ -696,7 +700,7 @@ mod tests {
         const ISSUE_AMOUNT: Amount = Amount::from_sat(12);
         issue_tokens(&fed, &client, &client_context.db, ISSUE_AMOUNT).await;
 
-        assert_eq!(client.coins().total_amount(), ISSUE_AMOUNT)
+        assert_eq!(client.coins().await.total_amount(), ISSUE_AMOUNT)
     }
 
     #[test_log::test(tokio::test)]
@@ -721,7 +725,7 @@ mod tests {
         let secp = &client.context.secp;
         let tbs_pks = &client.config.tbs_pks;
         let rng = rand::rngs::OsRng;
-        let coins = client.select_coins(SPEND_AMOUNT).unwrap();
+        let coins = client.select_coins(SPEND_AMOUNT).await.unwrap();
         let (spend_keys, input) = builder.create_input_from_coins(coins.clone()).unwrap();
         builder.input_coins(coins).unwrap();
         builder
@@ -752,7 +756,7 @@ mod tests {
             .await;
 
         // The right amount of money is left
-        assert_eq!(client.coins().total_amount(), SPEND_AMOUNT);
+        assert_eq!(client.coins().await.total_amount(), SPEND_AMOUNT);
 
         // Double spends aren't possible
         assert!(fed.lock().await.verify_input(&input).await.is_err());
@@ -763,7 +767,7 @@ mod tests {
             .db
             .begin_transaction(ModuleRegistry::default());
         let mut builder = TransactionBuilder::default();
-        let coins = client.select_coins(SPEND_AMOUNT).unwrap();
+        let coins = client.select_coins(SPEND_AMOUNT).await.unwrap();
         let rng = rand::rngs::OsRng;
         let (spend_keys, input) = builder.create_input_from_coins(coins.clone()).unwrap();
         builder.input_coins(coins).unwrap();
@@ -790,7 +794,7 @@ mod tests {
         );
 
         // No money is left
-        assert_eq!(client.coins().total_amount(), Amount::ZERO);
+        assert_eq!(client.coins().await.total_amount(), Amount::ZERO);
     }
 
     #[allow(clippy::needless_collect)]

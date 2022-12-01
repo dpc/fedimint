@@ -282,6 +282,7 @@ impl ServerModulePlugin for LightningModule {
         dbtx: &mut DatabaseTransaction<'_>,
     ) -> Vec<Self::ConsensusItem> {
         dbtx.find_by_prefix(&ProposeDecryptionShareKeyPrefix)
+            .await
             .map(|res| {
                 let (ProposeDecryptionShareKey(contract_id), share) = res.expect("DB error");
                 LightningConsensusItem { contract_id, share }
@@ -598,6 +599,7 @@ impl ServerModulePlugin for LightningModule {
         // Decrypt preimages
         let preimage_decryption_shares = dbtx
             .find_by_prefix(&AgreedDecryptionShareKeyPrefix)
+            .await
             .map(|res| {
                 let (key, value) = res.expect("DB error");
                 (key.0, (key.1, value))
@@ -766,10 +768,12 @@ impl ServerModulePlugin for LightningModule {
             .expect("DB error")
     }
 
-    fn audit(&self, dbtx: &DatabaseTransaction<'_>, audit: &mut Audit) {
-        audit.add_items(dbtx, &ContractKeyPrefix, |_, v| {
-            -(v.amount.milli_sat as i64)
-        });
+    async fn audit(&self, dbtx: &mut DatabaseTransaction<'_>, audit: &mut Audit) {
+        audit
+            .add_items(dbtx, &ContractKeyPrefix, |_, v| {
+                -(v.amount.milli_sat as i64)
+            })
+            .await;
     }
 
     fn api_base_name(&self) -> &'static str {
@@ -790,7 +794,7 @@ impl ServerModulePlugin for LightningModule {
             api_endpoint! {
                 "/offers",
                 async |module: &LightningModule, dbtx, _params: ()| -> Vec<IncomingContractOffer> {
-                    Ok(module.get_offers(&dbtx))
+                    Ok(module.get_offers(&mut dbtx).await)
                 }
             },
             api_endpoint! {
@@ -808,7 +812,7 @@ impl ServerModulePlugin for LightningModule {
             api_endpoint! {
                 "/list_gateways",
                 async |module: &LightningModule, dbtx, _v: ()| -> Vec<LightningGateway> {
-                    Ok(module.list_gateways(&dbtx))
+                    Ok(module.list_gateways(&mut dbtx).await)
                 }
             },
             api_endpoint! {
@@ -850,8 +854,12 @@ impl LightningModule {
             .expect("DB error")
     }
 
-    pub fn get_offers(&self, dbtx: &DatabaseTransaction) -> Vec<IncomingContractOffer> {
+    pub async fn get_offers(
+        &self,
+        dbtx: &mut DatabaseTransaction<'_>,
+    ) -> Vec<IncomingContractOffer> {
         dbtx.find_by_prefix(&OfferKeyPrefix)
+            .await
             .map(|res| res.expect("DB error").1)
             .collect()
     }
@@ -866,8 +874,9 @@ impl LightningModule {
             .expect("DB error")
     }
 
-    pub fn list_gateways(&self, dbtx: &DatabaseTransaction) -> Vec<LightningGateway> {
+    pub async fn list_gateways(&self, dbtx: &mut DatabaseTransaction<'_>) -> Vec<LightningGateway> {
         dbtx.find_by_prefix(&LightningGatewayKeyPrefix)
+            .await
             .map(|res| res.expect("DB error").1)
             .collect()
     }

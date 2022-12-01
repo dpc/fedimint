@@ -120,7 +120,7 @@ impl<'c> MintClient<'c> {
         let epoch = self.context.api.fetch_last_epoch().await?;
 
         let mut dbtx = self.start_dbtx();
-        let notes = self.get_available_notes(&mut dbtx);
+        let notes = self.get_available_notes(&mut dbtx).await;
         let last_idx = self.get_last_note_index(&mut dbtx).await;
 
         Ok(PlaintextEcashBackup {

@@ -409,6 +409,7 @@ impl ServerModulePlugin for Wallet {
         });
 
         dbtx.find_by_prefix(&PegOutTxSignatureCIPrefix)
+            .await
             .map(|res| {
                 let (key, val) = res.expect("FB error");
                 WalletConsensusItem::PegOutSignature(PegOutSignatureItem {
@@ -645,6 +646,7 @@ impl ServerModulePlugin for Wallet {
         // Sign and finalize any unsigned transactions that have signatures
         let unsigned_txs: Vec<(UnsignedTransactionKey, UnsignedTransaction)> = dbtx
             .find_by_prefix(&UnsignedTransactionPrefixKey)
+            .await
             .map(|res| res.expect("DB error"))
             .filter(|(_, unsigned)| !unsigned.signatures.is_empty())
             .collect();
@@ -707,14 +709,20 @@ impl ServerModulePlugin for Wallet {
             .expect("DB error")
     }
 
-    fn audit(&self, dbtx: &DatabaseTransaction<'_>, audit: &mut Audit) {
-        audit.add_items(dbtx, &UTXOPrefixKey, |_, v| v.amount.to_sat() as i64 * 1000);
-        audit.add_items(dbtx, &UnsignedTransactionPrefixKey, |_, v| {
-            v.change.to_sat() as i64 * 1000
-        });
-        audit.add_items(dbtx, &PendingTransactionPrefixKey, |_, v| {
-            v.change.to_sat() as i64 * 1000
-        });
+    async fn audit(&self, dbtx: &mut DatabaseTransaction<'_>, audit: &mut Audit) {
+        audit
+            .add_items(dbtx, &UTXOPrefixKey, |_, v| v.amount.to_sat() as i64 * 1000)
+            .await;
+        audit
+            .add_items(dbtx, &UnsignedTransactionPrefixKey, |_, v| {
+                v.change.to_sat() as i64 * 1000
+            })
+            .await;
+        audit
+            .add_items(dbtx, &PendingTransactionPrefixKey, |_, v| {
+                v.change.to_sat() as i64 * 1000
+            })
+            .await;
     }
 
     fn api_base_name(&self) -> &'static str {
@@ -737,7 +745,7 @@ impl ServerModulePlugin for Wallet {
                     let tx = module.offline_wallet().create_tx(
                         bitcoin::Amount::from_sat(sats),
                         address.script_pubkey(),
-                        module.available_utxos(&dbtx),
+                        module.available_utxos(&mut dbtx).await,
                         consensus.fee_rate,
                         &consensus.randomness_beacon
                     );
@@ -808,6 +816,7 @@ impl Wallet {
     ) {
         let mut cache: BTreeMap<Txid, UnsignedTransaction> = dbtx
             .find_by_prefix(&UnsignedTransactionPrefixKey)
+            .await
             .map(|res| {
                 let (key, val) = res.expect("DB error");
                 (key.0, val)
@@ -1031,6 +1040,7 @@ impl Wallet {
 
             let pending_transactions = dbtx
                 .find_by_prefix(&PendingTransactionPrefixKey)
+                .await
                 .map(|res| {
                     let (key, transaction) = res.expect("DB error");
                     (key.0, transaction)
@@ -1113,21 +1123,26 @@ impl Wallet {
         self.offline_wallet().create_tx(
             peg_out.amount,
             peg_out.recipient.script_pubkey(),
-            self.available_utxos(dbtx),
+            self.available_utxos(dbtx).await,
             peg_out.fees.fee_rate,
             &change_tweak,
         )
     }
 
-    fn available_utxos(&self, dbtx: &DatabaseTransaction) -> Vec<(UTXOKey, SpendableUTXO)> {
+    async fn available_utxos(
+        &self,
+        dbtx: &mut DatabaseTransaction<'_>,
+    ) -> Vec<(UTXOKey, SpendableUTXO)> {
         dbtx.find_by_prefix(&UTXOPrefixKey)
+            .await
             .collect::<Result<_, _>>()
             .expect("DB error")
     }
 
-    pub fn get_wallet_value(&self, dbtx: &DatabaseTransaction) -> bitcoin::Amount {
+    pub async fn get_wallet_value(&self, dbtx: &mut DatabaseTransaction<'_>) -> bitcoin::Amount {
         let sat_sum = self
             .available_utxos(dbtx)
+            .await
             .into_iter()
             .map(|(_, utxo)| utxo.amount.to_sat())
             .sum();
@@ -1440,9 +1455,10 @@ pub async fn run_broadcast_pending_tx(
     }
 }
 
-pub async fn broadcast_pending_tx(dbtx: DatabaseTransaction<'_>, rpc: &BitcoindRpc) {
+pub async fn broadcast_pending_tx(mut dbtx: DatabaseTransaction<'_>, rpc: &BitcoindRpc) {
     let pending_tx = dbtx
         .find_by_prefix(&PendingTransactionPrefixKey)
+        .await
         .collect::<Result<Vec<_>, _>>()
         .expect("DB error");
 

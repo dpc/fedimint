@@ -168,7 +168,7 @@ pub trait IServerModule: Debug {
     ///
     /// Summing over all modules, if liabilities > assets then an error has occurred in the database
     /// and consensus should halt.
-    fn audit(&self, dbtx: &DatabaseTransaction<'_>, audit: &mut Audit);
+    async fn audit(&self, dbtx: &mut DatabaseTransaction<'_>, audit: &mut Audit);
 
     /// Defines the prefix for API endpoints defined by the module.
     ///
@@ -439,8 +439,8 @@ where
     ///
     /// Summing over all modules, if liabilities > assets then an error has occurred in the database
     /// and consensus should halt.
-    fn audit(&self, dbtx: &DatabaseTransaction<'_>, audit: &mut Audit) {
-        <Self as ServerModulePlugin>::audit(self, dbtx, audit)
+    async fn audit(&self, dbtx: &mut DatabaseTransaction<'_>, audit: &mut Audit) {
+        <Self as ServerModulePlugin>::audit(self, dbtx, audit).await
     }
 
     fn api_base_name(&self) -> &'static str {

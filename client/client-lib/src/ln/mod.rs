@@ -191,12 +191,16 @@ impl<'c> LnClient<'c> {
             _ => Err(LnClientError::WrongAccountType),
         }
     }
-    pub fn refundable_outgoing_contracts(&self, block_height: u64) -> Vec<OutgoingContractData> {
+    pub async fn refundable_outgoing_contracts(
+        &self,
+        block_height: u64,
+    ) -> Vec<OutgoingContractData> {
         // TODO: unify block height type
         self.context
             .db
             .begin_transaction(ModuleRegistry::default())
             .find_by_prefix(&OutgoingPaymentKeyPrefix)
+            .await
             .filter_map(|res| {
                 let (_key, outgoing_data) = res.expect("DB error");
                 let cancelled = outgoing_data.contract_account.contract.cancelled;
@@ -572,8 +576,11 @@ mod tests {
 
         assert!(client
             .refundable_outgoing_contracts((timelock - 1) as u64)
+            .await
             .is_empty());
-        let refund_inputs = client.refundable_outgoing_contracts((timelock) as u64);
+        let refund_inputs = client
+            .refundable_outgoing_contracts((timelock) as u64)
+            .await;
         assert_eq!(refund_inputs.len(), 1);
         let contract_data = refund_inputs.into_iter().next().unwrap();
         let (refund_key, refund_input) =

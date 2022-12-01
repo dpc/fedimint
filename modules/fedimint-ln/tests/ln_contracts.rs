@@ -217,7 +217,15 @@ async fn test_incoming() {
 
     fed.consensus_round(&[], &[(offer_out_point, offer_output)])
         .await;
-    let offers = fed.fetch_from_all(|m, db| m.get_offers(&db.begin_transaction(ln_decoders())));
+    let mut results = Vec::new();
+    for (_, member, db) in fed.members.iter_mut() {
+        results.push(
+            member
+                .get_offers(&mut db.begin_transaction(ln_decoders()))
+                .await,
+        );
+    }
+    let offers = fedimint_testing::assert_all_equal(results.into_iter());
     assert_eq!(offers, vec![offer.clone()]);
 
     let contract = Contract::Incoming(IncomingContract {
