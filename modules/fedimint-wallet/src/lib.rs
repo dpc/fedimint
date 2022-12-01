@@ -361,11 +361,11 @@ impl ServerModulePlugin for Wallet {
         WalletModuleDecoder
     }
 
-    async fn await_consensus_proposal(&self, dbtx: &mut DatabaseTransaction<'_>) {
+    async fn await_consensus_proposal(&self, mut dbtx: DatabaseTransaction<'_>) {
         let mut our_target_height = self.target_height().await;
-        let last_consensus_height = self.consensus_height(dbtx).await.unwrap_or(0);
+        let last_consensus_height = self.consensus_height(&mut dbtx).await.unwrap_or(0);
 
-        if self.consensus_proposal(dbtx).await.len() == 1 {
+        if self.consensus_proposal(&mut dbtx).await.len() == 1 {
             while our_target_height <= last_consensus_height {
                 our_target_height = self.target_height().await;
                 sleep(Duration::from_millis(1000)).await;

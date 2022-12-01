@@ -271,8 +271,8 @@ impl ServerModulePlugin for LightningModule {
         LightningModuleDecoder
     }
 
-    async fn await_consensus_proposal(&self, dbtx: &mut DatabaseTransaction<'_>) {
-        if self.consensus_proposal(dbtx).await.is_empty() {
+    async fn await_consensus_proposal(&self, mut dbtx: DatabaseTransaction<'_>) {
+        if self.consensus_proposal(&mut dbtx).await.is_empty() {
             std::future::pending().await
         }
     }

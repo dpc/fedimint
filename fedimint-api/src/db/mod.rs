@@ -103,7 +103,7 @@ dyn_newtype_define! {
 pub trait IDatabaseTransaction<'a>: 'a + Send {
     async fn raw_insert_bytes(&mut self, key: &[u8], value: Vec<u8>) -> Result<Option<Vec<u8>>>;
 
-    async fn raw_get_bytes(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
+    async fn raw_get_bytes(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>>;
 
     async fn raw_remove_entry(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>>;
 

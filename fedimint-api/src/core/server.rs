@@ -69,7 +69,7 @@ pub trait IServerModule: Debug {
     fn decode_consensus_item(&self, r: &mut dyn io::Read) -> Result<ConsensusItem, DecodeError>;
 
     /// Blocks until a new `consensus_proposal` is available.
-    async fn await_consensus_proposal(&self, dbtx: &mut DatabaseTransaction<'_>);
+    async fn await_consensus_proposal(&self, mut dbtx: DatabaseTransaction<'_>);
 
     /// This module's contribution to the next consensus proposal
     async fn consensus_proposal(&self, dbtx: &mut DatabaseTransaction<'_>) -> Vec<ConsensusItem>;
@@ -244,7 +244,7 @@ where
     }
 
     /// Blocks until a new `consensus_proposal` is available.
-    async fn await_consensus_proposal(&self, dbtx: &mut DatabaseTransaction<'_>) {
+    async fn await_consensus_proposal(&self, dbtx: DatabaseTransaction<'_>) {
         <Self as ServerModulePlugin>::await_consensus_proposal(self, dbtx).await
     }
 

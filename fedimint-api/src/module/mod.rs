@@ -232,7 +232,7 @@ pub trait ServerModulePlugin: Debug + Sized {
     fn decoder(&self) -> Self::Decoder;
 
     /// Blocks until a new `consensus_proposal` is available.
-    async fn await_consensus_proposal<'a>(&'a self, dbtx: &mut DatabaseTransaction<'_>);
+    async fn await_consensus_proposal<'a>(&'a self, mut dbtx: DatabaseTransaction<'_>);
 
     /// This module's contribution to the next consensus proposal
     async fn consensus_proposal<'a>(
