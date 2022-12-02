@@ -370,15 +370,12 @@ mod tests {
             Ok(TransactionStatus::Accepted {
                 epoch: 0,
                 outputs: vec![SerdeOutputOutcome::from(&OutputOutcome::from(
-                    // FIXME: Need to block on this future because output_outcome is not send
-                    futures::executor::block_on(async {
-                        mint.output_outcome(OutPoint {
-                            txid: tx,
-                            out_idx: 0,
-                        })
-                        .await
-                        .unwrap()
-                    }),
+                    mint.output_outcome(OutPoint {
+                        txid: tx,
+                        out_idx: 0,
+                    })
+                    .await
+                    .unwrap(),
                 ))],
             })
         }
