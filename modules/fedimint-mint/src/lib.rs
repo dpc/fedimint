@@ -289,7 +289,7 @@ pub struct MintOutputOutcome(pub Option<SigResponse>);
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Encodable, Decodable)]
 pub struct MintConsensusItem(pub PartiallySignedRequest);
 
-#[async_trait(?Send)]
+#[async_trait]
 impl ServerModulePlugin for Mint {
     type Decoder = MintModuleDecoder;
     type Input = MintInput;

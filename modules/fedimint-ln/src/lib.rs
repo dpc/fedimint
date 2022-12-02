@@ -254,7 +254,7 @@ impl FederationModuleConfigGen for LightningModuleConfigGen {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl ServerModulePlugin for LightningModule {
     type Decoder = LightningModuleDecoder;
     type Input = LightningInput;

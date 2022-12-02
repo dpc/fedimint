@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::fmt::Debug;
 
 use async_trait::async_trait;
-use futures::future::LocalBoxFuture;
+use futures::future::BoxFuture;
 use secp256k1_zkp::XOnlyPublicKey;
 use thiserror::Error;
 
@@ -65,7 +65,7 @@ impl ApiError {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 pub trait TypedApiEndpoint {
     type State: Sync;
 
@@ -108,7 +108,7 @@ macro_rules! __api_endpoint {
     ) => {{
         struct Endpoint;
 
-        #[async_trait::async_trait(?Send)]
+        #[async_trait::async_trait]
         impl $crate::module::TypedApiEndpoint for Endpoint {
             const PATH: &'static str = $path;
             type State = $state_ty;
@@ -144,7 +144,7 @@ macro_rules! __api_endpoint {
 
 pub use __api_endpoint as api_endpoint;
 
-type HandlerFnReturn<'a> = LocalBoxFuture<'a, Result<serde_json::Value, ApiError>>;
+type HandlerFnReturn<'a> = BoxFuture<'a, Result<serde_json::Value, ApiError>>;
 type HandlerFn<M> = Box<
     dyn for<'a> Fn(
             &'a M,
@@ -218,7 +218,7 @@ pub trait FederationModuleConfigGen {
     fn validate_config(&self, identity: &PeerId, config: ServerModuleConfig) -> anyhow::Result<()>;
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 pub trait ServerModulePlugin: Debug + Sized {
     type Decoder: PluginDecode;
     type Input: PluginInput;

@@ -35,7 +35,7 @@ pub struct TestInputMeta {
 
 impl<Module> FakeFed<Module>
 where
-    Module: ServerModulePlugin + 'static,
+    Module: ServerModulePlugin + 'static + Send + Sync,
     Module::ConsensusItem: Clone,
     Module::OutputOutcome: Eq + Debug,
     Module::Decoder: Sync + Send + 'static,
@@ -333,7 +333,7 @@ impl FakeInterconnect {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl ModuleInterconect for FakeInterconnect {
     async fn call(
         &self,

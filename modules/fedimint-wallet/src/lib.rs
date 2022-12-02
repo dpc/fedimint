@@ -343,7 +343,7 @@ pub struct WalletOutput(pub PegOut);
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Deserialize, Serialize, Encodable, Decodable)]
 pub struct WalletVerificationCache;
 
-#[async_trait(?Send)]
+#[async_trait]
 impl ServerModulePlugin for Wallet {
     type Decoder = WalletModuleDecoder;
     type Input = WalletInput;

@@ -19,7 +19,7 @@ use crate::module::{
 };
 
 pub trait ModuleVerificationCache: Debug {
-    fn as_any(&self) -> &(dyn Any + 'static);
+    fn as_any(&self) -> &(dyn Any + 'static + Send + Sync);
     fn module_key(&self) -> ModuleKey;
     fn clone(&self) -> VerificationCache;
 }
@@ -37,7 +37,7 @@ impl<T> ModuleVerificationCache for T
 where
     T: PluginVerificationCache + 'static,
 {
-    fn as_any(&self) -> &(dyn Any + 'static) {
+    fn as_any(&self) -> &(dyn Any + 'static + Send + Sync) {
         self
     }
 
@@ -52,7 +52,7 @@ where
 /// Backend side module interface
 ///
 /// Server side Fedimint mondule needs to implement this trait.
-#[async_trait(?Send)]
+#[async_trait]
 pub trait IServerModule: Debug {
     fn module_key(&self) -> ModuleKey;
 
@@ -209,10 +209,10 @@ impl ModuleDecode for ServerModule {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl<T> IServerModule for T
 where
-    T: ServerModulePlugin + 'static,
+    T: ServerModulePlugin + 'static + Sync,
     <T as ServerModulePlugin>::Decoder: Sync + Send + 'static,
 {
     fn module_key(&self) -> ModuleKey {
