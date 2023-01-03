@@ -30,3 +30,19 @@ ar = "./.cargo/ar.x86_64-linux-android"
 linker = "./.cargo/ld.i686-linux-android"
 ar = "./.cargo/ar.i686-linux-android"
 
+[target.x86_64-unknown-linux-musl]
+# linker = "musl-clang"
+linker = "./.cargo/ld.x86_64-unknown-linux-musl"
+# rustflags = ["-C", "linker=-fuse-ld=gcc"]
+# rustflags = ["-C", "link-arg=-fuse-ld=ld"]
+# ar = "./.cargo/ar.x86_64-unknown-linux-musl"
+# rustflags = [
+    # "-C", "linker=./.cargo/ld.x86_64-unknown-linux-musl",
+    # "-L", "/nix/store/j23kaxllad27fap30yfc0y8rlc7n5wc0-libcxx-11.1.0/lib/",
+    # "-C", "linker=./.cargo/ld.x86_64-unknown-linux-musl",
+# ]
+ # rustflags = [
+ #     "-C", "linker=./.cargo/ld.x86_64-unknown-linux-musl",
+ # ]
+# rustflags = ["-C", "link-arg=-fuse-ld=gcc"]
+# linker = "musl-gcc"

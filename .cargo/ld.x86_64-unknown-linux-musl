@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+1>&2 echo "LDFLAGS: $LDFLAGS_x86_64_unknown_linux_musl"
+1>&2 echo "LD: $LD_x86_64_unknown_linux_musl"
+1>&2 echo "REST: $@"
+exec $LD_x86_64_unknown_linux_musl "$LDFLAGS_x86_64_unknown_linux_musl" "$@"

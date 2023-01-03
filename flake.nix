@@ -47,8 +47,22 @@
           '');
 
         musl64CrossEnvVars = ''
+          # ring doesn't compile, thinking the compiler is gcc ... :/
+          # export CC_x86_64_unknown_linux_musl="${pkgs.musl.dev}/bin/musl-clang"
           export CC_x86_64_unknown_linux_musl="${pkgs.musl.dev}/bin/musl-gcc -static"
-          export LD_x86_64_unknown_linux_musl="${pkgs.musl.dev}/bin/musl-gcc -static"
+          export LD_x86_64_unknown_linux_musl="${pkgs.llvmPackages_14.lld}/bin/ld.lld"
+          # too long
+          export LDFLAGS_x86_64_unknown_linux_musl="-L ${pkgs.pkgsMusl.llvmPackages_14.libcxx}/lib/"
+          # export LDFLAGS_x86_64_unknown_linux_musl="-L $$$$$$$$ {pkgs.pkgsMusl.gcc-unwrapped}/lib/"
+          export LDFLAGS_x86_64_unknown_linux_musl="-L ${pkgs.gcc-unwrapped}/lib/"
+          # musl C++ toolchain support seems meh, so we need a pre-built musl rockdb
+          # to avoid running c++?
+          # export ROCKSDB_COMPILE=true
+          # export CXX_x86_64_unknown_linux_musl="${pkgs.musl.dev}/bin/musl-gcc -static"
+          export ROCKSDB_LIB_DIR="${pkgs.pkgsMusl.rocksdb}/lib"
+          export SNAPPY_LIB_DIR="${pkgs.pkgsStatic.snappy}/lib"
+          export ROCKSDB_STATIC=true
+          export SNAPPY_STATIC=true
         '';
 
         # The following hack makes fedimint compile on android:
@@ -451,14 +465,35 @@
           });
 
         pkgCross = { name, dirs, target, bin ? null }:
-          let
-            craneLib = craneLibCross.${target.attr};
-            deps = craneLib.buildDepsOnly (commonArgs // {
-              src = filterWorkspaceDepsBuildFiles ./.;
-              pname = "pkg-${name}-${target.attr}-deps";
-              buildPhaseCargoCommand = "cargo build --profile $CARGO_PROFILE --target ${target.name} --package ${name}";
-              doCheck = false;
+          if target == null then
+            pkg { inherit name dirs bin; }
+          else
+            let
+              craneLib = craneLibCross.${target.attr};
+              deps = craneLib.buildDepsOnly (commonArgs // {
+                src = filterWorkspaceDepsBuildFiles ./.;
+                pname = "pkg-${name}-${target.attr}-deps";
+                buildPhaseCargoCommand = "cargo build --profile $CARGO_PROFILE --target ${target.name} --package ${name}";
+                doCheck = false;
 
+                preBuild = ''
+                  chmod +x .cargo/ar.*
+                  chmod +x .cargo/ld.*
+                  patchShebangs .cargo/
+                '' + target.extraEnvs;
+              });
+
+            in
+            craneLib.buildPackage (commonArgs // {
+              meta = { mainProgram = bin; };
+              pname = "pkg-${name}-${target.attr}";
+              cargoArtifacts = deps;
+
+              src = filterModules dirs ./.;
+              cargoExtraArgs = "--package ${name} --target ${target.name}";
+
+              # if needed we will check the whole workspace at once with `workspaceBuild`
+              doCheck = false;
               preBuild = ''
                 chmod +x .cargo/ar.*
                 chmod +x .cargo/ld.*
@@ -466,25 +501,7 @@
               '' + target.extraEnvs;
             });
 
-          in
-          craneLib.buildPackage (commonArgs // {
-            meta = { mainProgram = bin; };
-            pname = "pkg-${name}-${target.attr}";
-            cargoArtifacts = deps;
-
-            src = filterModules dirs ./.;
-            cargoExtraArgs = "--package ${name} --target ${target.name}";
-
-            # if needed we will check the whole workspace at once with `workspaceBuild`
-            doCheck = false;
-            preBuild = ''
-              chmod +x .cargo/ar.*
-              chmod +x .cargo/ld.*
-              patchShebangs .cargo/
-            '' + target.extraEnvs;
-          });
-
-        fedimintd = { target }: pkgCross {
+        fedimintd = { target ? null }: pkgCross {
           name = "fedimintd";
           bin = "fedimintd";
           inherit target;
@@ -514,9 +531,10 @@
           ];
         };
 
-        ln-gateway = pkg {
+        ln-gateway = { target ? null }: pkgCross {
           name = "ln-gateway";
           bin = "ln-gateway";
+          inherit target;
           dirs = [
             "crypto/aead"
             "crypto/derive-secret"
@@ -541,9 +559,10 @@
           ];
         };
 
-        gateway-cli = pkg {
+        gateway-cli = { target ? pkg }: pkgCross {
           name = "gateway-cli";
           bin = "gateway-cli";
+          inherit target;
           dirs = [
             "crypto/aead"
             "crypto/derive-secret"
@@ -696,7 +715,7 @@
         };
         # outputs that build a particular package
         outputsPackages = {
-          default = fedimintd;
+          default = fedimintd { };
 
           inherit fedimintd ln-gateway gateway-cli fedimint-cli fedimint-tests;
 
@@ -743,6 +762,8 @@
             (attr: target: {
               mint-client = mint-client { inherit target; };
               fedimintd = fedimintd { inherit target; };
+              ln-gateway = ln-gateway { inherit target; };
+              gateway-cli = gateway-cli { inherit target; };
             })
             crossTargets;
 
