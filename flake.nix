@@ -46,6 +46,11 @@
           ''
           '');
 
+        musl64CrossEnvVars = ''
+          export CC_x86_64_unknown_linux_musl="${pkgs.musl.dev}/bin/musl-gcc -static"
+          export LD_x86_64_unknown_linux_musl="${pkgs.musl.dev}/bin/musl-gcc -static"
+        '';
+
         # The following hack makes fedimint compile on android:
         #
         # From https://github.com/rust-mobile/cargo-apk/commit/4956b87f56f2854e2b3452b83b65b00224757d41
@@ -122,6 +127,10 @@
           builtins.mapAttrs
             (attr: target: { attr = attr; extraEnvs = ""; } // target)
             {
+              "x86_64-unknown-linux-musl" = {
+                name = "x86_64-unknown-linux-musl";
+                extraEnvs = musl64CrossEnvVars;
+              };
               "wasm32" = {
                 name = "wasm32-unknown-unknown";
                 extraEnvs = wasm32CrossEnvVars;
@@ -441,8 +450,7 @@
             doCheck = false;
           });
 
-
-        pkgCross = { name, dirs, target }:
+        pkgCross = { name, dirs, target, bin ? null }:
           let
             craneLib = craneLibCross.${target.attr};
             deps = craneLib.buildDepsOnly (commonArgs // {
@@ -460,6 +468,7 @@
 
           in
           craneLib.buildPackage (commonArgs // {
+            meta = { mainProgram = bin; };
             pname = "pkg-${name}-${target.attr}";
             cargoArtifacts = deps;
 
@@ -475,9 +484,10 @@
             '' + target.extraEnvs;
           });
 
-        fedimintd = pkg {
+        fedimintd = { target }: pkgCross {
           name = "fedimintd";
           bin = "fedimintd";
+          inherit target;
           dirs = [
             "client/client-lib"
             "crypto/aead"
@@ -732,6 +742,7 @@
           cross = builtins.mapAttrs
             (attr: target: {
               mint-client = mint-client { inherit target; };
+              fedimintd = fedimintd { inherit target; };
             })
             crossTargets;
 
@@ -888,7 +899,7 @@
 
                 # Android NDK not available for Arm MacOS
                 (if isArch64Darwin then "" else androidCrossEnvVars)
-                + wasm32CrossEnvVars;
+                + wasm32CrossEnvVars + musl64CrossEnvVars;
             });
 
             # this shell is used only in CI, so it should contain minimum amount
