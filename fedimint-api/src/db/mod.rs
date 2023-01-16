@@ -8,6 +8,7 @@ use thiserror::Error;
 use tracing::{trace, warn};
 
 use crate::{
+    core::ModuleInstanceId,
     encoding::{Decodable, Encodable},
     fmt_utils::AbbreviateHexBytes,
 };
@@ -169,6 +170,79 @@ impl Drop for CommitTracker {
     }
 }
 
+struct IsolatedDatabaseTransaction<'a> {
+    tx: Box<dyn IDatabaseTransaction<'a> + Send + 'a>,
+    prefix: Vec<u8>,
+}
+
+impl<'a> IsolatedDatabaseTransaction<'a> {
+    pub fn new(
+        dbtx: Box<dyn IDatabaseTransaction<'a> + Send + 'a>,
+        module_instance_id: ModuleInstanceId,
+    ) -> IsolatedDatabaseTransaction<'a> {
+        IsolatedDatabaseTransaction {
+            tx: dbtx,
+            // TODO: use consensus_encode
+            prefix: vec![
+                (module_instance_id >> 8) as u8,
+                (module_instance_id & 0xff) as u8,
+            ],
+        }
+    }
+}
+
+#[async_trait]
+impl<'a> IDatabaseTransaction<'a> for IsolatedDatabaseTransaction<'a> {
+    async fn raw_insert_bytes(&mut self, key: &[u8], value: Vec<u8>) -> Result<Option<Vec<u8>>> {
+        let mut key_with_prefix = self.prefix.clone();
+        key_with_prefix.append(&mut key.to_vec());
+        self.tx
+            .raw_insert_bytes(key_with_prefix.as_slice(), value)
+            .await
+    }
+
+    async fn raw_get_bytes(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+        let mut key_with_prefix = self.prefix.clone();
+        key_with_prefix.append(&mut key.to_vec());
+        self.tx.raw_get_bytes(key_with_prefix.as_slice()).await
+    }
+
+    async fn raw_remove_entry(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+        let mut key_with_prefix = self.prefix.clone();
+        key_with_prefix.append(&mut key.to_vec());
+        self.tx.raw_remove_entry(key_with_prefix.as_slice()).await
+    }
+
+    async fn raw_find_by_prefix(&mut self, key_prefix: &[u8]) -> PrefixIter<'_> {
+        let mut prefix_with_module = self.prefix.clone();
+        prefix_with_module.append(&mut key_prefix.to_vec());
+        let raw_prefix = self
+            .tx
+            .raw_find_by_prefix(prefix_with_module.as_slice())
+            .await;
+        Box::new(raw_prefix.map(|pair| match pair {
+            Ok(kv) => {
+                let key = kv.0;
+                let stripped_key = &key[(self.prefix.len())..];
+                Ok((stripped_key.to_vec(), kv.1))
+            }
+            _ => pair,
+        }))
+    }
+
+    async fn commit_tx(self: Box<Self>) -> Result<()> {
+        self.tx.commit_tx().await
+    }
+
+    async fn rollback_tx_to_savepoint(&mut self) {
+        self.tx.rollback_tx_to_savepoint().await
+    }
+
+    async fn set_tx_savepoint(&mut self) {
+        self.tx.set_tx_savepoint().await
+    }
+}
+
 #[doc = " A handle to a type-erased database implementation"]
 pub struct DatabaseTransaction<'a> {
     tx: Box<dyn IDatabaseTransaction<'a> + Send + 'a>,
@@ -202,6 +276,20 @@ impl<'a> DatabaseTransaction<'a> {
                 is_committed: false,
                 has_writes: false,
             },
+        }
+    }
+
+    pub fn with_module_prefix(
+        self,
+        module_instance_id: ModuleInstanceId,
+    ) -> DatabaseTransaction<'a> {
+        DatabaseTransaction {
+            tx: Box::new(IsolatedDatabaseTransaction::new(
+                self.tx,
+                module_instance_id,
+            )),
+            decoders: self.decoders,
+            commit_tracker: self.commit_tracker,
         }
     }
 
@@ -472,6 +560,9 @@ mod tests {
 
     #[derive(Debug, Encodable, Decodable, Eq, PartialEq)]
     struct TestVal(u64);
+
+    const TEST_MODULE_PREFIX: u16 = 1;
+    const ALT_MODULE_PREFIX: u16 = 2;
 
     pub async fn verify_insert_elements(db: Database) {
         let mut dbtx = db.begin_transaction().await;
@@ -895,5 +986,87 @@ mod tests {
         }
 
         assert_eq!(returned_keys, expected_keys);
+    }
+
+    pub async fn verify_module_prefix(db: Database) {
+        let mut test_dbtx = db
+            .begin_transaction()
+            .await
+            .with_module_prefix(TEST_MODULE_PREFIX);
+
+        assert!(test_dbtx
+            .insert_entry(&TestKey(100), &TestVal(101))
+            .await
+            .is_ok());
+
+        assert!(test_dbtx
+            .insert_entry(&TestKey(101), &TestVal(102))
+            .await
+            .is_ok());
+
+        test_dbtx.commit_tx().await.expect("DB Error");
+
+        let mut alt_dbtx = db
+            .begin_transaction()
+            .await
+            .with_module_prefix(ALT_MODULE_PREFIX);
+
+        assert!(alt_dbtx
+            .insert_entry(&TestKey(100), &TestVal(103))
+            .await
+            .is_ok());
+
+        assert!(alt_dbtx
+            .insert_entry(&TestKey(101), &TestVal(104))
+            .await
+            .is_ok());
+
+        alt_dbtx.commit_tx().await.expect("DB Error");
+
+        // verfiy test_module_dbtx can only see key/value pairs from its own module
+        let mut test_dbtx = db
+            .begin_transaction()
+            .await
+            .with_module_prefix(TEST_MODULE_PREFIX);
+        assert_eq!(
+            test_dbtx.get_value(&TestKey(100)).await.unwrap(),
+            Some(TestVal(101))
+        );
+
+        assert_eq!(
+            test_dbtx.get_value(&TestKey(101)).await.unwrap(),
+            Some(TestVal(102))
+        );
+
+        let mut returned_keys = 0;
+        let expected_keys = 2;
+        for res in test_dbtx.find_by_prefix(&DbPrefixTestPrefix).await {
+            match res.as_ref().unwrap().0 {
+                TestKey(100) => {
+                    assert!(res.unwrap().1.eq(&TestVal(101)));
+                    returned_keys += 1;
+                }
+                TestKey(101) => {
+                    assert!(res.unwrap().1.eq(&TestVal(102)));
+                    returned_keys += 1;
+                }
+                _ => {
+                    returned_keys += 1;
+                }
+            }
+        }
+
+        assert_eq!(returned_keys, expected_keys);
+
+        let removed = test_dbtx.remove_entry(&TestKey(100)).await;
+        assert!(removed.is_ok());
+        assert_eq!(removed.unwrap(), Some(TestVal(101)));
+        assert_eq!(test_dbtx.get_value(&TestKey(100)).await.unwrap(), None);
+
+        // test_dbtx on its own wont find the key because it does not use a module prefix
+        let mut test_dbtx = db.begin_transaction().await;
+        assert_eq!(test_dbtx.get_value(&TestKey(101)).await.unwrap(), None);
+
+        test_dbtx.commit_tx().await.expect("DB Error");
     }
 }
