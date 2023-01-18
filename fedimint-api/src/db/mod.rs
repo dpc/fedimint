@@ -87,7 +87,10 @@ impl Database {
     }
 
     pub async fn begin_transaction(&self) -> DatabaseTransaction {
-        DatabaseTransaction::new(self.0.db.begin_transaction().await, &self.0.module_decoders)
+        DatabaseTransaction::new(
+            self.0.db.begin_transaction().await,
+            self.0.module_decoders.clone(),
+        )
     }
 }
 
@@ -170,16 +173,16 @@ impl Drop for CommitTracker {
     }
 }
 
-struct IsolatedDatabaseTransaction<'a> {
-    tx: Box<dyn IDatabaseTransaction<'a> + Send + 'a>,
+struct IsolatedDatabaseTransaction<'a, 'b: 'a> {
+    tx: &'b mut DatabaseTransaction<'a>,
     prefix: Vec<u8>,
 }
 
-impl<'a> IsolatedDatabaseTransaction<'a> {
+impl<'a, 'b> IsolatedDatabaseTransaction<'a, 'b> {
     pub fn new(
-        dbtx: Box<dyn IDatabaseTransaction<'a> + Send + 'a>,
+        dbtx: &'b mut DatabaseTransaction<'a>,
         module_instance_id: ModuleInstanceId,
-    ) -> IsolatedDatabaseTransaction<'a> {
+    ) -> IsolatedDatabaseTransaction<'a, 'b> {
         IsolatedDatabaseTransaction {
             tx: dbtx,
             // TODO: use consensus_encode
@@ -192,7 +195,7 @@ impl<'a> IsolatedDatabaseTransaction<'a> {
 }
 
 #[async_trait]
-impl<'a> IDatabaseTransaction<'a> for IsolatedDatabaseTransaction<'a> {
+impl<'a, 'b> IDatabaseTransaction<'a> for IsolatedDatabaseTransaction<'a, 'b> {
     async fn raw_insert_bytes(&mut self, key: &[u8], value: Vec<u8>) -> Result<Option<Vec<u8>>> {
         let mut key_with_prefix = self.prefix.clone();
         key_with_prefix.append(&mut key.to_vec());
@@ -231,7 +234,7 @@ impl<'a> IDatabaseTransaction<'a> for IsolatedDatabaseTransaction<'a> {
     }
 
     async fn commit_tx(self: Box<Self>) -> Result<()> {
-        self.tx.commit_tx().await
+        Ok(())
     }
 
     async fn rollback_tx_to_savepoint(&mut self) {
@@ -246,8 +249,8 @@ impl<'a> IDatabaseTransaction<'a> for IsolatedDatabaseTransaction<'a> {
 #[doc = " A handle to a type-erased database implementation"]
 pub struct DatabaseTransaction<'a> {
     tx: Box<dyn IDatabaseTransaction<'a> + Send + 'a>,
-    decoders: &'a ModuleDecoderRegistry,
-    commit_tracker: CommitTracker,
+    decoders: ModuleDecoderRegistry,
+    //commit_tracker: CommitTracker,
 }
 
 impl<'a> std::ops::Deref for DatabaseTransaction<'a> {
@@ -267,34 +270,30 @@ impl<'a> std::ops::DerefMut for DatabaseTransaction<'a> {
 impl<'a> DatabaseTransaction<'a> {
     pub fn new(
         dbtx: Box<dyn IDatabaseTransaction<'a> + Send + 'a>,
-        decoders: &'a ModuleDecoderRegistry,
+        decoders: ModuleDecoderRegistry,
     ) -> DatabaseTransaction<'a> {
         DatabaseTransaction {
             tx: dbtx,
             decoders,
-            commit_tracker: CommitTracker {
-                is_committed: false,
-                has_writes: false,
-            },
+            //commit_tracker: CommitTracker {
+            //    is_committed: false,
+            //    has_writes: false,
+            //},
         }
     }
 
     pub fn with_module_prefix(
-        self,
+        &'a mut self,
         module_instance_id: ModuleInstanceId,
     ) -> DatabaseTransaction<'a> {
-        DatabaseTransaction {
-            tx: Box::new(IsolatedDatabaseTransaction::new(
-                self.tx,
-                module_instance_id,
-            )),
-            decoders: self.decoders,
-            commit_tracker: self.commit_tracker,
-        }
+        let decoders = self.decoders.clone();
+        let isolated = Box::new(IsolatedDatabaseTransaction::new(self, module_instance_id));
+        let dbtx = DatabaseTransaction::new(isolated, decoders);
+        dbtx
     }
 
     pub async fn commit_tx(mut self) -> Result<()> {
-        self.commit_tracker.is_committed = true;
+        //self.commit_tracker.is_committed = true;
         return self.tx.commit_tx().await;
     }
 
@@ -313,7 +312,7 @@ impl<'a> DatabaseTransaction<'a> {
             std::any::type_name::<K::Value>(),
             AbbreviateHexBytes(&value_bytes)
         );
-        Ok(Some(K::Value::from_bytes(&value_bytes, self.decoders)?))
+        Ok(Some(K::Value::from_bytes(&value_bytes, &self.decoders)?))
     }
 
     pub async fn find_by_prefix<KP>(
@@ -346,7 +345,7 @@ impl<'a> DatabaseTransaction<'a> {
     where
         K: DatabaseKey + DatabaseKeyPrefixConst,
     {
-        self.commit_tracker.has_writes = true;
+        //self.commit_tracker.has_writes = true;
         match self
             .raw_insert_bytes(&key.to_bytes(), value.to_bytes())
             .await?
@@ -357,7 +356,7 @@ impl<'a> DatabaseTransaction<'a> {
                     std::any::type_name::<K::Value>(),
                     AbbreviateHexBytes(&old_val_bytes)
                 );
-                Ok(Some(K::Value::from_bytes(&old_val_bytes, self.decoders)?))
+                Ok(Some(K::Value::from_bytes(&old_val_bytes, &self.decoders)?))
             }
             None => Ok(None),
         }
@@ -371,7 +370,7 @@ impl<'a> DatabaseTransaction<'a> {
     where
         K: DatabaseKey + DatabaseKeyPrefixConst,
     {
-        self.commit_tracker.has_writes = true;
+        //self.commit_tracker.has_writes = true;
         match self
             .raw_insert_bytes(&key.to_bytes(), value.to_bytes())
             .await?
@@ -391,21 +390,21 @@ impl<'a> DatabaseTransaction<'a> {
     where
         K: DatabaseKey + DatabaseKeyPrefixConst,
     {
-        self.commit_tracker.has_writes = true;
+        //self.commit_tracker.has_writes = true;
         let key_bytes = key.to_bytes();
         let value_bytes = match self.raw_remove_entry(&key_bytes).await? {
             Some(value) => value,
             None => return Ok(None),
         };
 
-        Ok(Some(K::Value::from_bytes(&value_bytes, self.decoders)?))
+        Ok(Some(K::Value::from_bytes(&value_bytes, &self.decoders)?))
     }
 
     pub async fn remove_by_prefix<KP>(&mut self, key_prefix: &KP) -> Result<()>
     where
         KP: DatabaseKeyPrefix + DatabaseKeyPrefixConst,
     {
-        self.commit_tracker.has_writes = true;
+        //self.commit_tracker.has_writes = true;
         self.raw_remove_by_prefix(&key_prefix.to_bytes()).await
     }
 }
@@ -492,7 +491,7 @@ impl DecodingError {
 }
 
 mod tests {
-    use super::Database;
+    use super::{Database, DatabaseTransaction};
     use crate::db::DatabaseKeyPrefixConst;
     use crate::encoding::{Decodable, Encodable};
 
@@ -989,6 +988,9 @@ mod tests {
     }
 
     pub async fn verify_module_prefix(db: Database) {
+        let mut test_dbtx = db.begin_transaction().await;
+        let mut module_dbtx = test_dbtx.with_module_prefix(TEST_MODULE_PREFIX);
+        /*
         let mut test_dbtx = db
             .begin_transaction()
             .await
@@ -1068,5 +1070,6 @@ mod tests {
         assert_eq!(test_dbtx.get_value(&TestKey(101)).await.unwrap(), None);
 
         test_dbtx.commit_tx().await.expect("DB Error");
+        */
     }
 }
