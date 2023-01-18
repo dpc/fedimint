@@ -173,16 +173,16 @@ impl Drop for CommitTracker {
     }
 }
 
-struct IsolatedDatabaseTransaction<'a, 'b: 'a> {
-    tx: &'b mut DatabaseTransaction<'a>,
+pub struct IsolatedDatabaseTransaction<'isolated, 'parent: 'isolated> {
+    tx: &'isolated mut DatabaseTransaction<'parent>,
     prefix: Vec<u8>,
 }
 
-impl<'a, 'b> IsolatedDatabaseTransaction<'a, 'b> {
+impl<'isolated, 'parent: 'isolated> IsolatedDatabaseTransaction<'isolated, 'parent> {
     pub fn new(
-        dbtx: &'b mut DatabaseTransaction<'a>,
+        dbtx: &'isolated mut DatabaseTransaction<'parent>,
         module_instance_id: ModuleInstanceId,
-    ) -> IsolatedDatabaseTransaction<'a, 'b> {
+    ) -> IsolatedDatabaseTransaction<'isolated, 'parent> {
         IsolatedDatabaseTransaction {
             tx: dbtx,
             // TODO: use consensus_encode
@@ -280,16 +280,6 @@ impl<'a> DatabaseTransaction<'a> {
             //    has_writes: false,
             //},
         }
-    }
-
-    pub fn with_module_prefix(
-        &'a mut self,
-        module_instance_id: ModuleInstanceId,
-    ) -> DatabaseTransaction<'a> {
-        let decoders = self.decoders.clone();
-        let isolated = Box::new(IsolatedDatabaseTransaction::new(self, module_instance_id));
-        let dbtx = DatabaseTransaction::new(isolated, decoders);
-        dbtx
     }
 
     pub async fn commit_tx(mut self) -> Result<()> {
@@ -406,6 +396,32 @@ impl<'a> DatabaseTransaction<'a> {
     {
         //self.commit_tracker.has_writes = true;
         self.raw_remove_by_prefix(&key_prefix.to_bytes()).await
+    }
+}
+
+impl<'parent> DatabaseTransaction<'parent> {
+    pub fn with_module_prefix<'isolated>(
+        &'isolated mut self,
+        module_instance_id: ModuleInstanceId,
+    ) -> DatabaseTransaction<'isolated>
+    where
+        'parent: 'isolated,
+    {
+        let decoders = self.decoders.clone();
+        let isolated = Box::new(IsolatedDatabaseTransaction::new(self, module_instance_id));
+        let dbtx = DatabaseTransaction::new(isolated, decoders);
+        dbtx
+    }
+
+    pub fn with_module_prefix_2<'isolated>(
+        &'isolated mut self,
+        module_instance_id: ModuleInstanceId,
+    ) -> IsolatedDatabaseTransaction<'isolated, 'parent>
+    where
+        'parent: 'isolated,
+    {
+        // let decoders = self.decoders.clone();
+        IsolatedDatabaseTransaction::new(self, module_instance_id)
     }
 }
 
@@ -989,7 +1005,12 @@ mod tests {
 
     pub async fn verify_module_prefix(db: Database) {
         let mut test_dbtx = db.begin_transaction().await;
-        let mut module_dbtx = test_dbtx.with_module_prefix(TEST_MODULE_PREFIX);
+        {
+            let mut _module_dbtx = test_dbtx.with_module_prefix_2(TEST_MODULE_PREFIX);
+        }
+        {
+            let mut _module_dbtx = test_dbtx.with_module_prefix(TEST_MODULE_PREFIX);
+        }
         /*
         let mut test_dbtx = db
             .begin_transaction()
