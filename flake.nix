@@ -881,6 +881,7 @@
                 cargo-udeps
                 pkgs.parallel
                 pkgs.semgrep
+                pkgs.just
 
                 (pkgs.writeShellScriptBin "git-recommit" "exec git commit --edit -F <(cat \"$(git rev-parse --git-path COMMIT_EDITMSG)\" | grep -v -E '^#.*') \"$@\"")
 
@@ -925,6 +926,16 @@
                     >&2 echo " ️  Please add 'set -g default-command \"\''${SHELL}\"' to your '$HOME/.tmux.conf' for tmuxinator test setup to work correctly"
                   fi
                 fi
+
+                # if runing in direnv
+                if [ -n "''${DIRENV_IN_ENVRC:-}" ]; then
+                  # and not set DIRENV_LOG_FORMAT
+                  if [ -n "''${DIRENV_LOG_FORMAT:-}" ]; then
+                    >&2 echo "💡 Set 'DIRENV_LOG_FORMAT=""' in your shell scripts for cleaner output"
+                  fi
+                fi
+
+                >&2 echo "💡 Run 'just' for a list of available 'just ...' helper recipies"
               '';
             };
 
