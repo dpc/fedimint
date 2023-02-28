@@ -991,7 +991,7 @@ dependencies = [
  "tbs",
  "test-log",
  "thiserror",
- "threshold_crypto",
+ "threshold_crypto 0.4.0 (git+https://github.com/jkitman/threshold_crypto?branch=upgrade-threshold-crypto-libs)",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -1095,7 +1095,7 @@ dependencies = [
  "strum_macros",
  "test-log",
  "thiserror",
- "threshold_crypto",
+ "threshold_crypto 0.4.0 (git+https://github.com/jkitman/threshold_crypto?branch=upgrade-threshold-crypto-libs)",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -1140,7 +1140,7 @@ dependencies = [
  "tbs",
  "test-log",
  "thiserror",
- "threshold_crypto",
+ "threshold_crypto 0.4.0 (git+https://github.com/jkitman/threshold_crypto?branch=upgrade-threshold-crypto-libs)",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1192,7 +1192,7 @@ dependencies = [
  "tbs",
  "test-log",
  "thiserror",
- "threshold_crypto",
+ "threshold_crypto 0.4.0 (git+https://github.com/jkitman/threshold_crypto?branch=upgrade-threshold-crypto-libs)",
  "tokio",
  "tokio-rustls",
  "tokio-stream",
@@ -1274,7 +1274,7 @@ dependencies = [
  "mint-client",
  "rand",
  "serde",
- "threshold_crypto",
+ "threshold_crypto 0.4.0 (git+https://github.com/jkitman/threshold_crypto?branch=upgrade-threshold-crypto-libs)",
  "tokio",
  "tracing",
  "url",
@@ -1351,7 +1351,7 @@ dependencies = [
  "sha3",
  "tbs",
  "thiserror",
- "threshold_crypto",
+ "threshold_crypto 0.4.0 (git+https://github.com/jkitman/threshold_crypto?branch=upgrade-threshold-crypto-libs)",
  "tokio",
  "tokio-rustls",
  "tokio-util",
@@ -1602,7 +1602,7 @@ dependencies = [
  "portpicker",
  "rand",
  "serde_json",
- "threshold_crypto",
+ "threshold_crypto 0.4.0 (git+https://github.com/jkitman/threshold_crypto?branch=upgrade-threshold-crypto-libs)",
  "tokio",
  "tracing",
  "url",
@@ -1746,7 +1746,7 @@ dependencies = [
 [[package]]
 name = "hbbft"
 version = "0.1.1"
-source = "git+https://github.com/jkitman/hbbft?branch=upgrade-threshold-crypto-libs#3951544ab6834f56d300d065f43e673a6009ecad"
+source = "git+https://github.com/jkitman/hbbft?branch=upgrade-threshold-crypto-libs#f9be9f1f4bf5a889d76a463c4e73481fe3437c0b"
 dependencies = [
  "bincode",
  "byteorder",
@@ -1760,7 +1760,7 @@ dependencies = [
  "reed-solomon-erasure",
  "serde",
  "thiserror",
- "threshold_crypto",
+ "threshold_crypto 0.4.0 (git+https://github.com/fedimint/threshold_crypto)",
  "tiny-keccak",
 ]
 
@@ -2552,7 +2552,7 @@ dependencies = [
  "tempfile",
  "test-log",
  "thiserror",
- "threshold_crypto",
+ "threshold_crypto 0.4.0 (git+https://github.com/jkitman/threshold_crypto?branch=upgrade-threshold-crypto-libs)",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -3949,6 +3949,27 @@ dependencies = [
 name = "threshold_crypto"
 version = "0.4.0"
 source = "git+https://github.com/jkitman/threshold_crypto?branch=upgrade-threshold-crypto-libs#82146b3eecd6602231c7741f508f9d910e887072"
+dependencies = [
+ "bls12_381",
+ "byteorder",
+ "ff",
+ "group",
+ "hex_fmt",
+ "log",
+ "pairing",
+ "rand",
+ "rand_chacha",
+ "serde",
+ "subtle",
+ "thiserror",
+ "tiny-keccak",
+ "zeroize",
+]
+
+[[package]]
+name = "threshold_crypto"
+version = "0.4.0"
+source = "git+https://github.com/fedimint/threshold_crypto#f5b283e74268f566eae7439a2b82bef14cdd0b2a"
 dependencies = [
  "bls12_381",
  "byteorder",
