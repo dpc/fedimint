@@ -1,0 +1,9 @@
+rules:
+
+- id: ban-std-system-time
+  languages:
+    - rust
+  message: Use fedimint_core::time instead of std::time::SystemTime for better wasm compat.
+  pattern: "use std::time::SystemTime;"
+
+  severity: WARNING
