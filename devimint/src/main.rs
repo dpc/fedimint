@@ -9,7 +9,7 @@ use bitcoincore_rpc::bitcoin::Amount as BitcoinRpcAmount;
 use bitcoincore_rpc::RpcApi;
 use clap::{Parser, Subcommand};
 use cln_rpc::primitives::{Amount as ClnRpcAmount, AmountOrAny};
-use devimint::federation::Fedimintd;
+use devimint::federation::{Federation, Fedimintd};
 use devimint::util::{poll, ProcessManager};
 use devimint::{
     cmd, dev_fed, external_daemons, vars, Bitcoind, DevFed, LightningNode, Lightningd, Lnd,
@@ -725,6 +725,9 @@ async fn cli_tests(dev_fed: DevFed) -> Result<()> {
         final_cln_outgoing_gateway_balance - final_cln_incoming_gateway_balance
     );
 
+    // TODO: make sure there are no in-progress operations involved
+    cli_tests_backup_and_restore(&fed).await?;
+
     // LND gateway tests
     fed.use_gateway(&gw_lnd).await?;
 
@@ -845,6 +848,63 @@ async fn cli_tests(dev_fed: DevFed) -> Result<()> {
     );
 
     // TODO: test cancel/timeout
+
+    Ok(())
+}
+
+async fn cli_tests_backup_and_restore(fed_cli: &Federation) -> Result<()> {
+    let secret = cmd!(fed_cli, "ng", "print-secret").out_json().await?["secret"]
+        .as_str()
+        .map(ToOwned::to_owned)
+        .unwrap();
+
+    let pre_balance = cmd!(fed_cli, "ng", "info").out_json().await?["total_msat"]
+        .as_u64()
+        .unwrap();
+
+    // we need to have some funds
+    // TODO: right now we rely on previous tests to leave some balance
+    assert!(0 < pre_balance);
+
+    // without existing backup
+    {
+        let _ = cmd!(fed_cli, "ng", "wipe", "--force",).out_json().await?;
+
+        assert_eq!(
+            0,
+            cmd!(fed_cli, "ng", "info").out_json().await?["total_msat"]
+                .as_u64()
+                .unwrap()
+        );
+        let _ = cmd!(fed_cli, "ng", "restore", &secret,).out_json().await?;
+
+        let post_balance = cmd!(fed_cli, "ng", "info").out_json().await?["total_msat"]
+            .as_u64()
+            .unwrap();
+
+        assert_eq!(pre_balance, post_balance);
+    }
+
+    // with a backup
+    {
+        let _ = cmd!(fed_cli, "ng", "backup",).out_json().await?;
+
+        let _ = cmd!(fed_cli, "ng", "wipe", "--force",).out_json().await?;
+
+        assert_eq!(
+            0,
+            cmd!(fed_cli, "ng", "info").out_json().await?["total_msat"]
+                .as_u64()
+                .unwrap()
+        );
+        let _ = cmd!(fed_cli, "ng", "restore", &secret,).out_json().await?;
+
+        let post_balance = cmd!(fed_cli, "ng", "info").out_json().await?["total_msat"]
+            .as_u64()
+            .unwrap();
+
+        assert_eq!(pre_balance, post_balance);
+    }
 
     Ok(())
 }
