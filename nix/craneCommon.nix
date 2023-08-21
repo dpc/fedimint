@@ -5,6 +5,12 @@
 # * build inputs
 # * env variables
 
+let
+  # placeholder we use to avoid actually needing to detect hash via running `git`
+  # 012345... for easy recognizability (in case something went wrong),
+  # rest randomized to avoid accidentally overwriting innocent bytes in the binary
+  gitHashPlaceholderValue = "01234569abcdef7afa1d2683a099c7af48a523c1";
+in
 { src, srcDotCargo, pkgs, lib, clightning-dev, pkgs-kitman, moreutils-ts, ... }:
 craneLib:
 craneLib.overrideScope' (self: prev: {
@@ -12,10 +18,8 @@ craneLib.overrideScope' (self: prev: {
   commonSrc = builtins.path { path = src; name = "fedimint"; };
 
   commonProfile = "release";
-  # placeholder we use to avoid actually needing to detect hash via running `git`
-  # 012345... for easy recognizability (in case something went wrong),
-  # rest randomized to avoid accidentally overwriting innocent bytes in the binary
-  gitHashPlaceholderValue = "01234569abcdef7afa1d2683a099c7af48a523c1";
+
+  gitHashPlaceholderValue = gitHashPlaceholderValue;
 
   filterSrcWithRegexes = regexes: src:
     let
@@ -81,7 +85,7 @@ craneLib.overrideScope' (self: prev: {
 
   # env variables we want to set in all nix derivations (but NOT the nix develop shell)
   commonEnvs = self.commonEnvsShell // {
-    FEDIMINT_BUILD_FORCE_GIT_HASH = self.gitHashPlaceholderValue;
+    FEDIMINT_BUILD_FORCE_GIT_HASH = gitHashPlaceholderValue;
   };
 
   commonArgsBase = {

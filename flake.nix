@@ -94,7 +94,7 @@
           #
           # To avoid impurity, we use a git hash placeholder when building binaries
           # and then replace them with the real git hash in the binaries themselves.
-          replaceGitHash = { package, name, placeholder }:
+          replaceGitHash = { package, name, placeholder ? craneLibNative.gitHashPlaceholderValue }:
             let
               # the hash we will set if the tree is dirty;
               dirty-hash = "0000000000000000000000000000000000000000";
@@ -173,7 +173,7 @@
           # `rustPackageOutputs` with git hash replaced from placeholder to a real value
           # To avoid rebuilding too much source needlessly, we replace placeholders with real git hash (which changes on every build),
           # as a very last step.
-          rustPackageOutputsFinal = craneLib: builtins.mapAttrs (name: package: replaceGitHash { inherit name package; placeholder = craneLib.gitHashPlaceholderValue; }) (rustPackageOutputs craneLib);
+          rustPackageOutputsFinal = craneLib: builtins.mapAttrs (name: package: replaceGitHash { inherit name package; placeholder = craneLib: craneLib.gitHashPlaceholderValue; }) (rustPackageOutputs craneLib);
 
           # All tests, grouped together, so we can `nix build -L .#cli-test.<name>` or `nix build -L .#ci.cli-test.<name>`, etc.
           cli-test = craneLib: {
