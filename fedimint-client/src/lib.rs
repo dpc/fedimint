@@ -1401,9 +1401,16 @@ impl ClientBuilder {
         );
     }
 
+    pub async fn store_client_secret_raw<T>(db: &Database, val: &T)
+    where
+        T: Encodable,
+    {
+        set_client_root_secret(&mut dbtx, &secret).await;
+    }
+
     pub async fn build_restoring_from_backup<S>(
         self,
-        secret: ClientSecret<S>,
+        root_secret: DerivableSecret,
     ) -> anyhow::Result<(Client, Metadata)>
     where
         S: RootSecretStrategy,
@@ -1434,30 +1441,27 @@ impl ClientBuilder {
         // );
 
         // Write new root secret to DB before starting client
-        set_client_root_secret(&mut dbtx, &secret).await;
         dbtx.commit_tx().await;
 
-        let client = self.build::<S>().await?;
+        let client = self.build(root_secret).await?;
         let metadata = client.restore_from_backup().await?;
 
         Ok((client, metadata))
     }
 
+    // pub fn load_secret(db: &Database) -> Option<T> where T : Decodable {
+    //     ...
+    // }
+
     /// Build a [`Client`] and start its executor
-    pub async fn build<S>(self) -> anyhow::Result<Client>
-    where
-        S: RootSecretStrategy,
-    {
-        let client = self.build_stopped::<S>().await?;
+    pub async fn build(self, root_secret: DerivableSecret) -> anyhow::Result<Client> {
+        let client = self.build_stopped(root_secret).await?;
         client.start_executor().await;
         Ok(client)
     }
 
     /// Build a [`Client`] but do not start the executor
-    pub async fn build_stopped<S>(self) -> anyhow::Result<Client>
-    where
-        S: RootSecretStrategy,
-    {
+    pub async fn build_stopped(self, root_secret: DerivableSecret) -> anyhow::Result<Client> {
         let (config, decoders, db) = match self.db.ok_or(anyhow!("No database was provided"))? {
             DatabaseSource::Fresh(db) => {
                 let db = Database::new_from_box(db, ModuleDecoderRegistry::default());
@@ -1506,8 +1510,6 @@ impl ClientBuilder {
             &db,
         )
         .await?;
-
-        let root_secret = get_client_root_secret::<S>(&db).await;
 
         let modules = {
             let mut modules = ClientModuleRegistry::default();
