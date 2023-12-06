@@ -30,8 +30,7 @@
 
                 clightning = prev.clightning.overrideAttrs (oldAttrs: {
                   configureFlags = [ "--enable-developer" "--disable-valgrind" ];
-                } // pkgs.lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-                  NIX_CFLAGS_COMPILE = "-Wno-stringop-truncation -w";
+                  NIX_CFLAGS_COMPILE = "-w";
                 });
 
                 # Note: we are using cargo-nextest from pkgs-unstable because it has some fixes we need
