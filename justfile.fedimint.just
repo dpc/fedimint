@@ -61,5 +61,8 @@ exit-tmuxinator:
   tmux kill-session -t fedimint-dev
 
 # backport a PR
-backport-pr pr:
-  nix shell nixpkgs#nodejs -c npx backport --pr-filter {{pr}}
+backport-pr pr *rest='':
+  nix shell nixpkgs#nodejs -c npx backport --pr-filter {{pr}} {{rest}}
+
+backport-commit commit *rest='':
+  nix shell nixpkgs#nodejs -c npx backport --commit {{commit}} {{rest}}
