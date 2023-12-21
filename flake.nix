@@ -40,7 +40,9 @@
 
                   nativeBuildInputs = [ final.pkg-config ];
 
-                  buildInputs = [ final.openssl ] ++ lib.optionals stdenv.isDarwin [ final.curl final.Security ];
+                  buildInputs = [ final.openssl ] ++ lib.optionals stdenv.isDarwin [ final.curl 
+                    final.darwin.apple_sdk.frameworks.Security
+                  ];
 
                   nativeCheckInputs = [ final.nodejs ];
 
@@ -350,10 +352,10 @@
               });
 
               # Like `cross` but only with wasm
-              crossWasm = flakeboxLib.mkDevShell (craneMultiBuild.commonEnvsShell // craneMultiBuild.commonEnvsShellRocksdbLink // {
+              crossWasm = flakeboxLib.mkDevShell (commonShellArgs // craneMultiBuild.commonEnvsShellRocksdbLink // {
                 toolchain = toolchainWasm;
 
-                packages = [
+                packages = commonShellArgs.packages or [] ++ [
                   pkgs.wasm-pack
                   pkgs.wasm-bindgen-cli
                   pkgs.geckodriver
