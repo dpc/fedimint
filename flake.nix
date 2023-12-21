@@ -10,7 +10,7 @@
     };
     flake-utils.url = "github:numtide/flake-utils";
     flakebox = {
-      url = "github:dpc/flakebox?rev=4c659e425a347e0e90fc661c48e7fb20014cc120";
+      url = "github:dpc/flakebox?rev=846a8cd5e1a282472316f7b4ef75cf9d5872b7f3";
     };
     advisory-db = {
       url = "github:rustsec/advisory-db";
@@ -352,10 +352,10 @@
               });
 
               # Like `cross` but only with wasm
-              crossWasm = flakeboxLib.mkDevShell (commonShellArgs // craneMultiBuild.commonEnvsShellRocksdbLink // {
+              crossWasm = flakeboxLib.mkDevShell (commonShellArgs // {
                 toolchain = toolchainWasm;
 
-                packages = commonShellArgs.packages or [] ++ [
+                nativeBuildInputs= commonShellArgs.nativeBuildInputs or [] ++ [
                   pkgs.wasm-pack
                   pkgs.wasm-bindgen-cli
                   pkgs.geckodriver
