@@ -1,11 +1,12 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-kitman.url = "github:jkitman/nixpkgs/add-esplora-pkg";
     flake-utils.url = "github:numtide/flake-utils";
     flakebox = {
       url = "github:rustshop/flakebox?rev=390c23bc911b354f16db4d925dbe9b1f795308ed";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
     advisory-db = {
       url = "github:rustsec/advisory-db";
@@ -53,6 +54,7 @@
                   NIX_CFLAGS_COMPILE = "-Wno-stringop-truncation -w";
                 });
 
+
                 # Note: we are using cargo-nextest from pkgs-unstable because it has some fixes we need
                 # Note: shell script adding DYLD_FALLBACK_LIBRARY_PATH because of: https://github.com/nextest-rs/nextest/issues/962
                 cargo-nextest = pkgs.writeShellScriptBin "cargo-nextest" "exec env DYLD_FALLBACK_LIBRARY_PATH=\"$(dirname $(${pkgs.which}/bin/which rustc))/../lib\" ${pkgs-unstable.cargo-nextest}/bin/cargo-nextest \"$@\"";
@@ -92,6 +94,8 @@
                 "rust-src"
                 "llvm-tools-preview"
               ];
+              # we have our own rustfmt
+              rust.rustfmt.enable = false;
               # we have our own weird CI workflows
               github.ci.enable = false;
               just.includePaths = [
