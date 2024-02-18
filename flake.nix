@@ -225,6 +225,7 @@
                   pkgs.nil
                   pkgs.convco
                   pkgs.nodePackages.bash-language-server
+                  pkgs.sccache
                 ] ++ lib.optionals (!stdenv.isAarch64 && !stdenv.isDarwin) [
                   pkgs.semgrep
                 ] ++ lib.optionals (stdenv.isLinux) [
@@ -257,6 +258,8 @@
                   if [ "$(ulimit -Sn)" -lt "1024" ]; then
                       >&2 echo "⚠️  ulimit too small. Run 'ulimit -Sn 1024' to avoid problems running tests"
                   fi
+
+                  export RUSTC_WRAPPER=${pkgs.sccache}/bin/sccache
                 '';
               };
             in
