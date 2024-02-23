@@ -2,6 +2,7 @@ use std::cmp::min;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::future::Future;
+use std::ops;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -10,13 +11,13 @@ pub use anyhow::Result;
 use bitcoin::{BlockHash, Network, Script, Transaction, Txid};
 use fedimint_core::envs::BitcoinRpcConfig;
 use fedimint_core::fmt_utils::OptStacktrace;
-use fedimint_core::task::TaskHandle;
+use fedimint_core::task::{sleep, MaybeSend, MaybeSync, TaskHandle};
 use fedimint_core::txoproof::TxOutProof;
 use fedimint_core::util::SafeUrl;
 use fedimint_core::{apply, async_trait_maybe_send, dyn_newtype_define, Feerate};
 use fedimint_logging::LOG_BLOCKCHAIN;
 use lazy_static::lazy_static;
-use tracing::info;
+use tracing::{info, warn};
 
 #[cfg(feature = "bitcoincore-rpc")]
 pub mod bitcoincore;
@@ -78,6 +79,8 @@ dyn_newtype_define! {
     #[derive(Clone)]
     pub DynBitcoindRpcFactory(Arc<IBitcoindRpcFactory>)
 }
+
+const TRANSACTION_STATUS_FETCH_INTERVAL: Duration = Duration::from_secs(1);
 
 /// Trait that allows interacting with the Bitcoin blockchain
 ///
@@ -142,6 +145,131 @@ pub trait IBitcoindRpc: Debug {
 
     /// Returns a proof that a tx is included in the bitcoin blockchain
     async fn get_txout_proof(&self, txid: Txid) -> Result<TxOutProof>;
+}
+
+/// Extension trait over [`IBitcoindRpc`] adding some commonly needed logic
+#[apply(async_trait_maybe_send!)]
+pub trait IBitcoindRpcExt {
+    /// Like [`IBitcoindRpc::get_tx_block_height`] but retries until success
+    async fn get_tx_block_height_retry(&self, txid: &Txid) -> Option<u64>;
+    /// Like [`IBitcoindRpc::watch_script_history`] but retries until success
+    async fn watch_script_history_retry(&self, script: &Script);
+    /// Like [`IBitcoindRpc::get_script_history`] but retries until success
+    async fn get_script_history_retry(&self, script: &Script) -> Vec<Transaction>;
+    /// Like [`Self::get_script_history_retry`], but filters for matching
+    /// outputs
+    async fn get_script_history_outputs_retry(&self, script: &Script) -> Vec<(Transaction, u32)>;
+    /// Like [`IBitcoindRpc::get_txout_proof`] but retries until success
+    async fn get_txout_proof_retry(&self, txid: Txid) -> TxOutProof;
+    /// Like [`Self::get_script_history_outputs_retry`], but will not return
+    /// empty vec
+    async fn wait_script_history_outputs_retry(&self, script: &Script) -> Vec<(Transaction, u32)>;
+}
+
+#[apply(async_trait_maybe_send!)]
+impl<T: ?Sized> IBitcoindRpcExt for T
+where
+    // T: IBitcoindRpc + MaybeSend + MaybeSync,
+    T: IBitcoindRpc + Send + Sync,
+{
+    async fn watch_script_history_retry(&self, script: &Script) {
+        loop {
+            match self.watch_script_history(script).await {
+                Ok(_) => break,
+                Err(e) => warn!("Error while awaiting btc tx submitting: {e}"),
+            }
+            sleep(TRANSACTION_STATUS_FETCH_INTERVAL).await;
+        }
+    }
+
+    async fn get_script_history_retry(&self, script: &Script) -> Vec<Transaction> {
+        loop {
+            match self.get_script_history(script).await {
+                Ok(o) => return o,
+                Err(e) => warn!("Error while awaiting btc tx submitting: {e}"),
+            }
+            sleep(TRANSACTION_STATUS_FETCH_INTERVAL).await;
+        }
+    }
+
+    async fn get_txout_proof_retry(&self, txid: Txid) -> TxOutProof {
+        loop {
+            match self.get_txout_proof(txid).await {
+                Ok(o) => return o,
+                Err(e) => warn!("Error while getting txout proof: {e}"),
+            }
+            sleep(TRANSACTION_STATUS_FETCH_INTERVAL).await;
+        }
+    }
+
+    async fn get_tx_block_height_retry(&self, txid: &Txid) -> Option<u64> {
+        loop {
+            match self.get_tx_block_height(txid).await {
+                Ok(o) => return o,
+                Err(e) => warn!("Error while getting txout proof: {e}"),
+            }
+            sleep(TRANSACTION_STATUS_FETCH_INTERVAL).await;
+        }
+    }
+
+    async fn get_script_history_outputs_retry(&self, script: &Script) -> Vec<(Transaction, u32)> {
+        self.get_script_history_retry(script)
+            .await
+            .into_iter()
+            .flat_map(|tx| {
+                tx.output
+                    .clone()
+                    .into_iter()
+                    .enumerate()
+                    .filter(|(_idx, out)| &out.script_pubkey == script)
+                    .map(move |(idx, _out)| {
+                        (
+                            tx.clone(),
+                            u32::try_from(idx).expect("bitcoin outputs fit in u32"),
+                        )
+                    })
+            })
+            .collect()
+    }
+    async fn wait_script_history_outputs_retry(&self, script: &Script) -> Vec<(Transaction, u32)> {
+        loop {
+            let res = self.get_script_history_outputs_retry(script).await;
+
+            if !res.is_empty() {
+                return res;
+            }
+
+            info!("No matching outputs found awiting for script");
+            sleep(TRANSACTION_STATUS_FETCH_INTERVAL).await;
+        }
+    }
+}
+
+#[apply(async_trait_maybe_send!)]
+impl IBitcoindRpcExt for DynBitcoindRpc {
+    async fn watch_script_history_retry(&self, script: &Script) {
+        ops::Deref::deref(self)
+            .watch_script_history_retry(script)
+            .await
+    }
+    async fn get_script_history_retry(&self, script: &Script) -> Vec<Transaction> {
+        ops::Deref::deref(self)
+            .get_script_history_retry(script)
+            .await
+    }
+    async fn get_script_history_outputs_retry(&self, script: &Script) -> Vec<(Transaction, u32)> {
+        ops::Deref::deref(self)
+            .get_script_history_outputs_retry(script)
+            .await
+    }
+    async fn wait_script_history_outputs_retry(&self, script: &Script) -> Vec<(Transaction, u32)> {
+        ops::Deref::deref(self)
+            .wait_script_history_outputs_retry(script)
+            .await
+    }
+    async fn get_txout_proof_retry(&self, txid: Txid) -> Result<TxOutProof> {
+        ops::Deref::deref(self).get_txout_proof_retry(script).await
+    }
 }
 
 dyn_newtype_define! {

@@ -1,4 +1,5 @@
 pub mod api;
+mod recovery;
 
 pub mod client_db;
 mod deposit;
@@ -11,10 +12,12 @@ use std::time::SystemTime;
 use anyhow::{anyhow, bail, ensure, Context as AnyhowContext};
 use async_stream::stream;
 use bitcoin::{Address, Network};
-use client_db::DbKeyPrefix;
+use client_db::{DbKeyPrefix, RecoveryFinalizedKey, RecoveryStateKey};
 use fedimint_bitcoind::{create_bitcoind, DynBitcoindRpc};
 use fedimint_client::derivable_secret::{ChildId, DerivableSecret};
-use fedimint_client::module::init::{ClientModuleInit, ClientModuleInitArgs};
+use fedimint_client::module::init::{
+    ClientModuleInit, ClientModuleInitArgs, ClientModuleRecoverArgs,
+};
 use fedimint_client::module::recovery::NoModuleBackup;
 use fedimint_client::module::{ClientContext, ClientModule, IClientModule};
 use fedimint_client::oplog::UpdateStreamOrOutcome;
@@ -42,6 +45,7 @@ use fedimint_wallet_common::tweakable::Tweakable;
 pub use fedimint_wallet_common::*;
 use futures::{Stream, StreamExt};
 use rand::{thread_rng, Rng};
+use recovery::{WalletBackup, WalletRecovery};
 use secp256k1::{All, Secp256k1};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
@@ -138,6 +142,18 @@ impl ModuleInit for WalletClientInit {
                             .insert("NextPegInTweakIndex".to_string(), Box::new(index));
                     }
                 }
+                DbKeyPrefix::RecoveryState => {
+                    wallet_client_items.insert(
+                        "RecoveryState".to_string(),
+                        Box::new(dbtx.get_value(&RecoveryStateKey).await),
+                    );
+                }
+                DbKeyPrefix::RecoveryFinalized => {
+                    wallet_client_items.insert(
+                        "RecoveryFinalized".to_string(),
+                        Box::new(dbtx.get_value(&RecoveryFinalizedKey).await),
+                    );
+                }
             }
         }
 
@@ -175,6 +191,14 @@ impl ClientModuleInit for WalletClientInit {
             secp: Default::default(),
             client_ctx: args.context(),
         })
+    }
+
+    async fn recover(
+        &self,
+        args: &ClientModuleRecoverArgs<Self>,
+        snapshot: Option<&<Self::Module as ClientModule>::Backup>,
+    ) -> anyhow::Result<()> {
+        WalletRecovery::recover(args, snapshot).await
     }
 }
 
@@ -219,7 +243,7 @@ pub struct WalletClientModule {
 impl ClientModule for WalletClientModule {
     type Init = WalletClientInit;
     type Common = WalletModuleTypes;
-    type Backup = NoModuleBackup;
+    type Backup = WalletBackup;
     type ModuleStateMachineContext = WalletClientContext;
     type States = WalletClientStates;
 
@@ -287,26 +311,14 @@ impl WalletClientModule {
     }
 
     pub async fn get_deposit_address_inner(
-        &self,
+        self,
         valid_until: SystemTime,
         dbtx: &mut DatabaseTransaction<'_>,
     ) -> (OperationId, WalletClientStates, Address) {
-        let secret_tweak_key = self
-            .module_root_secret
-            .child_key(WALLET_TWEAK_CHILD_ID)
-            .child_key(get_next_peg_in_tweak_child_id(dbtx).await)
-            .to_secp_key(&self.secp);
-
-        let public_tweak_key = secret_tweak_key.public_key();
-        let operation_id = OperationId(public_tweak_key.x_only_public_key().0.serialize()); // TODO: make hash?
-
-        let address = bitcoin30_to_bitcoin29_address(
-            self.cfg
-                .peg_in_descriptor
-                .tweak(&public_tweak_key, secp256k1::SECP256K1)
-                .address(bitcoin29_to_bitcoin30_network(self.cfg.network))
-                .unwrap(),
-        );
+        let deposit_idx = get_next_peg_in_tweak_child_id(dbtx).await;
+        let (secret_tweak_key, _, address, operation_id) =
+            Self::derive_deposit_address_static(&self.cfg, &self.module_root_secret, deposit_idx)
+                .await;
 
         let deposit_sm = WalletClientStates::Deposit(DepositStateMachine {
             operation_id,
@@ -317,6 +329,36 @@ impl WalletClientModule {
         });
 
         (operation_id, deposit_sm, address)
+    }
+
+    async fn derive_deposit_address_static(
+        cfg: &WalletClientConfig,
+        module_root_secret: &DerivableSecret,
+        idx: ChildId,
+    ) -> (
+        secp256k1::KeyPair,
+        secp256k1::PublicKey,
+        Address,
+        OperationId,
+    ) {
+        let secret_tweak_key = module_root_secret
+            .child_key(WALLET_TWEAK_CHILD_ID)
+            .child_key(idx)
+            .to_secp_key(&secp256k1::SECP256K1);
+
+        let public_tweak_key = secret_tweak_key.public_key();
+
+        let address = bitcoin30_to_bitcoin29_address(
+            cfg.peg_in_descriptor
+                .tweak(&public_tweak_key, secp256k1::SECP256K1)
+                .address(bitcoin29_to_bitcoin30_network(cfg.network))
+                .unwrap(),
+        );
+
+        // TODO: make hash?
+        let operation_id = OperationId(public_tweak_key.x_only_public_key().0.serialize());
+
+        (secret_tweak_key, public_tweak_key, address, operation_id)
     }
 
     /// Fetches the fees that would need to be paid to make the withdraw request

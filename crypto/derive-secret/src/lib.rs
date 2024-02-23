@@ -22,6 +22,7 @@ use fedimint_core::BitcoinHash;
 use hkdf::hashes::Sha512;
 use hkdf::{bitcoin_hashes, Hkdf};
 use ring::aead;
+use secp256k1_zkp::serde::{Deserialize, Serialize};
 use secp256k1_zkp::{KeyPair, Secp256k1, Signing};
 
 const CHILD_TAG: &[u8; 8] = b"childkey";
@@ -31,7 +32,21 @@ const CHACHA20_POLY1305: &[u8; 8] = b"c20p1305";
 const RAW_BYTES: &[u8; 8] = b"rawbytes";
 
 /// Describes a child key of a [`DerivableSecret`]
-#[derive(Debug, Copy, Clone, Encodable, Decodable)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Default,
+    Encodable,
+    Decodable,
+    Serialize,
+    Deserialize,
+)]
+#[serde(transparent)]
 pub struct ChildId(pub u64);
 
 /// A secret that can have child-subkey derived from it.

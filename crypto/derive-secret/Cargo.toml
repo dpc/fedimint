@@ -24,3 +24,4 @@ hkdf = { package = "fedimint-hkdf", version = "=0.4.0-alpha", path = "../../cryp
 ring = "0.17.8"
 secp256k1-zkp = { version = "0.7.0", features = [ "serde" ] }
 bls12_381 = "0.7.1"
+serde = { version = "1.0", features = ["derive"] }

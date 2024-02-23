@@ -1556,6 +1556,7 @@ dependencies = [
  "fedimint-hkdf",
  "ring 0.17.8",
  "secp256k1-zkp",
+ "serde",
 ]
 
 [[package]]

@@ -2,6 +2,7 @@ use std::cmp;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use fedimint_bitcoind::IBitcoindRpcExt as _;
 use fedimint_client::sm::{ClientSMDatabaseTransaction, State, StateTransition};
 use fedimint_client::transaction::ClientInput;
 use fedimint_client::DynGlobalClientContext;
@@ -108,53 +109,18 @@ async fn await_created_btc_transaction_submitted(
             .tweak(&tweak.public_key(), &context.secp)
             .script_pubkey(),
     );
-    loop {
-        match context.rpc.watch_script_history(&script).await {
-            Ok(_) => break,
-            Err(e) => warn!("Error while awaiting btc tx submitting: {e}"),
-        }
-        sleep(TRANSACTION_STATUS_FETCH_INTERVAL).await;
-    }
-    for attempt in 0u32.. {
-        sleep(cmp::min(
-            TRANSACTION_STATUS_FETCH_INTERVAL * attempt,
-            Duration::from_secs(60 * 15),
-        ))
-        .await;
+    context.rpc.watch_script_history_retry(&script).await;
 
-        match context.rpc.get_script_history(&script).await {
-            Ok(received) => {
-                // TODO: fix
-                if received.len() > 1 {
-                    warn!("More than one transaction was sent to deposit address, only considering the first one");
-                }
+    let mut res = context.rpc.wait_script_history_outputs_retry(&script).await;
 
-                if let Some(transaction) = received.into_iter().next() {
-                    let out_idx = transaction
-                        .output
-                        .iter()
-                        .enumerate()
-                        .find_map(|(idx, output)| {
-                            if output.script_pubkey == script {
-                                Some(idx as u32)
-                            } else {
-                                None
-                            }
-                        })
-                        .expect("TODO: handle invalid tx returned by API");
-
-                    return (transaction, out_idx);
-                } else {
-                    trace!("No transactions received yet for script {script:?}");
-                }
-            }
-            Err(e) => {
-                warn!("Error fetching transaction history for {script:?}: {e}");
-            }
-        }
+    // TODO: we could just handle all of them here, why not?
+    if res.len() > 1 {
+        warn!(
+            "More than one transaction was sent to deposit address, only considering the first one"
+        );
     }
 
-    unreachable!()
+    res.swap_remove(0)
 }
 
 async fn transition_tx_seen(

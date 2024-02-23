@@ -613,7 +613,7 @@ mod fedimint_migration_tests {
         snapshot_db_migrations, snapshot_db_migrations_client, validate_migrations_client,
         validate_migrations_server, BYTE_20, BYTE_32, BYTE_33,
     };
-    use fedimint_wallet_client::client_db::NextPegInTweakIndexKey;
+    use fedimint_wallet_client::client_db::{self, NextPegInTweakIndexKey};
     use fedimint_wallet_client::{WalletClientInit, WalletClientModule};
     use fedimint_wallet_common::{
         PegOutFees, Rbf, SpendableUTXO, WalletCommonInit, WalletOutputOutcome,
@@ -968,9 +968,9 @@ mod fedimint_migration_tests {
             "wallet-client",
             |db, _, _| async move {
                 let mut dbtx = db.begin_transaction_nc().await;
-                for prefix in fedimint_wallet_client::client_db::DbKeyPrefix::iter() {
+                for prefix in client_db::DbKeyPrefix::iter() {
                     match prefix {
-                        fedimint_wallet_client::client_db::DbKeyPrefix::NextPegInTweakIndex => {
+                        client_db::DbKeyPrefix::NextPegInTweakIndex => {
                             let next_peg_in_tweak = dbtx.get_value(&NextPegInTweakIndexKey).await;
                             ensure!(
                                 next_peg_in_tweak.is_some(),
@@ -978,6 +978,8 @@ mod fedimint_migration_tests {
                             );
                             info!("Validated next peg in tweak index");
                         }
+                        client_db::DbKeyPrefix::RecoveryState => {}
+                        client_db::DbKeyPrefix::RecoveryFinalized => {}
                     }
                 }
 
