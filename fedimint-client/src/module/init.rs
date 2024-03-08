@@ -13,7 +13,7 @@ use fedimint_core::module::{
     ApiVersion, CommonModuleInit, IDynCommonModuleInit, ModuleInit, MultiApiVersion,
 };
 use fedimint_core::task::{MaybeSend, MaybeSync};
-use fedimint_core::{apply, async_trait_maybe_send, dyn_newtype_define};
+use fedimint_core::{apply, async_trait_maybe_send, dyn_newtype_define, NumPeers};
 use fedimint_derive_secret::DerivableSecret;
 use tokio::sync::watch;
 use tracing::warn;
@@ -31,6 +31,7 @@ where
     C: ClientModuleInit,
 {
     federation_id: FederationId,
+    peer_num: usize,
     cfg: <<C as ModuleInit>::Common as CommonModuleInit>::ClientConfig,
     db: Database,
     core_api_version: ApiVersion,
@@ -48,6 +49,10 @@ where
 {
     pub fn federation_id(&self) -> &FederationId {
         &self.federation_id
+    }
+
+    pub fn peer_num(&self) -> usize {
+        self.peer_num
     }
 
     pub fn cfg(&self) -> &<<C as ModuleInit>::Common as CommonModuleInit>::ClientConfig {
@@ -107,6 +112,7 @@ where
     C: ClientModuleInit,
 {
     federation_id: FederationId,
+    num_peers: NumPeers,
     cfg: <<C as ModuleInit>::Common as CommonModuleInit>::ClientConfig,
     db: Database,
     core_api_version: ApiVersion,
@@ -125,6 +131,10 @@ where
 {
     pub fn federation_id(&self) -> &FederationId {
         &self.federation_id
+    }
+
+    pub fn num_peers(&self) -> NumPeers {
+        self.num_peers
     }
 
     pub fn cfg(&self) -> &<<C as ModuleInit>::Common as CommonModuleInit>::ClientConfig {
@@ -241,6 +251,7 @@ pub trait IClientModuleInit: IDynCommonModuleInit + Debug + MaybeSend + MaybeSyn
         &self,
         final_client: FinalClient,
         federation_id: FederationId,
+        num_peers: NumPeers,
         cfg: ClientModuleConfig,
         db: Database,
         instance_id: ModuleInstanceId,
@@ -258,6 +269,7 @@ pub trait IClientModuleInit: IDynCommonModuleInit + Debug + MaybeSend + MaybeSyn
         &self,
         final_client: FinalClient,
         federation_id: FederationId,
+        peer_num: usize,
         cfg: ClientModuleConfig,
         db: Database,
         instance_id: ModuleInstanceId,
@@ -296,6 +308,7 @@ where
         &self,
         final_client: FinalClient,
         federation_id: FederationId,
+        num_peers: NumPeers,
         cfg: ClientModuleConfig,
         db: Database,
         instance_id: ModuleInstanceId,
@@ -320,6 +333,7 @@ where
             .recover(
                 &ClientModuleRecoverArgs {
                     federation_id,
+                    num_peers,
                     cfg: typed_cfg.clone(),
                     db: db.with_prefix_module_id(instance_id),
                     core_api_version,
@@ -345,6 +359,7 @@ where
         &self,
         final_client: FinalClient,
         federation_id: FederationId,
+        peer_num: usize,
         cfg: ClientModuleConfig,
         db: Database,
         instance_id: ModuleInstanceId,
@@ -359,6 +374,7 @@ where
         Ok(self
             .init(&ClientModuleInitArgs {
                 federation_id,
+                peer_num,
                 cfg: typed_cfg.clone(),
                 db: db.with_prefix_module_id(instance_id),
                 core_api_version,

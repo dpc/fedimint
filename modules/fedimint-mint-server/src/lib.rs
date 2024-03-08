@@ -16,7 +16,7 @@ use fedimint_core::module::{
 };
 use fedimint_core::server::DynServerModule;
 use fedimint_core::{
-    apply, async_trait_maybe_send, push_db_key_items, push_db_pair_items, Amount, NumPeers,
+    apply, async_trait_maybe_send, push_db_key_items, push_db_pair_items, Amount, NumPeersExt,
     OutPoint, PeerId, ServerModule, Tiered, TieredMultiZip,
 };
 use fedimint_metrics::{histogram_opts, lazy_static, prometheus, register_histogram, Histogram};

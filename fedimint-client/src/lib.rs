@@ -108,7 +108,7 @@ use fedimint_core::transaction::Transaction;
 use fedimint_core::util::{BoxStream, NextOrPending};
 use fedimint_core::{
     apply, async_trait_maybe_send, dyn_newtype_define, fedimint_build_code_version_env,
-    maybe_add_send, maybe_add_send_sync, Amount, OutPoint, TransactionId,
+    maybe_add_send, maybe_add_send_sync, Amount, NumPeers, OutPoint, TransactionId,
 };
 pub use fedimint_derive_secret as derivable_secret;
 use fedimint_derive_secret::DerivableSecret;
@@ -2076,6 +2076,7 @@ impl ClientBuilder {
                 let start_module_recover_fn =
                     |snapshot: Option<ClientBackup>, progress: RecoveryProgress| {
                         let module_config = module_config.clone();
+                        let num_peers = NumPeers::from(config.global.api_endpoints.len());
                         let db = db.clone();
                         let kind = kind.clone();
                         let notifier = notifier.clone();
@@ -2090,6 +2091,7 @@ impl ClientBuilder {
                                         .recover(
                                             final_client.clone(),
                                             fed_id,
+                                        num_peers,
                                             module_config.clone(),
                                             db.clone(),
                                             module_instance_id,
@@ -2158,6 +2160,7 @@ impl ClientBuilder {
                         .init(
                             final_client.clone(),
                             fed_id,
+                            config.global.api_endpoints.len(),
                             module_config,
                             db.clone(),
                             module_instance_id,

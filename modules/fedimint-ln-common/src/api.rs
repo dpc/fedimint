@@ -14,7 +14,7 @@ use fedimint_core::endpoint_constants::{
 use fedimint_core::module::ApiRequestErased;
 use fedimint_core::query::{ThresholdOrDeadline, UnionResponses};
 use fedimint_core::task::{MaybeSend, MaybeSync};
-use fedimint_core::{apply, async_trait_maybe_send, NumPeers, PeerId};
+use fedimint_core::{apply, async_trait_maybe_send, NumPeersExt, PeerId};
 use itertools::Itertools;
 use secp256k1::schnorr::Signature;
 use secp256k1::PublicKey;

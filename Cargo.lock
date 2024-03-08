@@ -1974,6 +1974,70 @@ dependencies = [
 ]
 
 [[package]]
+name = "fedimint-meta-client"
+version = "0.3.0-alpha"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "erased-serde",
+ "fedimint-client",
+ "fedimint-core",
+ "fedimint-meta-common",
+ "fedimint-threshold-crypto",
+ "futures",
+ "rand",
+ "secp256k1 0.24.3",
+ "serde",
+ "strum",
+ "strum_macros",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "fedimint-meta-common"
+version = "0.3.0-alpha"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bitcoin_hashes 0.11.0",
+ "erased-serde",
+ "fedimint-core",
+ "fedimint-threshold-crypto",
+ "futures",
+ "hex",
+ "rand",
+ "secp256k1 0.24.3",
+ "serde",
+ "strum",
+ "strum_macros",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "fedimint-meta-server"
+version = "0.3.0-alpha"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bitcoin_hashes 0.11.0",
+ "erased-serde",
+ "fedimint-core",
+ "fedimint-logging",
+ "fedimint-meta-common",
+ "futures",
+ "rand",
+ "secp256k1 0.24.3",
+ "serde",
+ "strum",
+ "strum_macros",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "fedimint-metrics"
 version = "0.3.0-alpha"
 dependencies = [

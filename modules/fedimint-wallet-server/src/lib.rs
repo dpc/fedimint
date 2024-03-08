@@ -50,7 +50,7 @@ use fedimint_core::task::sleep;
 use fedimint_core::task::{TaskGroup, TaskHandle};
 use fedimint_core::{
     apply, async_trait_maybe_send, push_db_key_items, push_db_pair_items, Amount, Feerate,
-    NumPeers, OutPoint, PeerId, ServerModule,
+    NumPeersExt, OutPoint, PeerId, ServerModule,
 };
 use fedimint_metrics::{histogram_opts, lazy_static, prometheus, register_histogram, Histogram};
 use fedimint_server::config::distributedgen::PeerHandleOps;
