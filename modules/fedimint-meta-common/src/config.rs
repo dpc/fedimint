@@ -1,6 +1,6 @@
 use fedimint_core::core::ModuleKind;
 use fedimint_core::encoding::{Decodable, Encodable};
-use fedimint_core::{plugin_types_trait_impl_config, Amount};
+use fedimint_core::plugin_types_trait_impl_config;
 use serde::{Deserialize, Serialize};
 
 use crate::MetaCommonInit;
@@ -14,21 +14,17 @@ pub struct MetaGenParams {
 
 /// Local parameters for config generation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MetaGenParamsLocal(pub String);
+pub struct MetaGenParamsLocal {}
 
 /// Consensus parameters for config generation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MetaGenParamsConsensus {
-    pub tx_fee: Amount,
-}
+pub struct MetaGenParamsConsensus {}
 
 impl Default for MetaGenParams {
     fn default() -> Self {
         Self {
-            local: MetaGenParamsLocal("example".to_string()),
-            consensus: MetaGenParamsConsensus {
-                tx_fee: Amount::ZERO,
-            },
+            local: MetaGenParamsLocal {},
+            consensus: MetaGenParamsConsensus {},
         }
     }
 }

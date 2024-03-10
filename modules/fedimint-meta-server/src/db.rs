@@ -1,6 +1,6 @@
 use fedimint_core::encoding::{Decodable, Encodable};
 use fedimint_core::{impl_db_lookup, impl_db_record, PeerId};
-use fedimint_meta_common::{MetaKey, MetaValue};
+use fedimint_meta_common::{MetaConsensusValue, MetaKey, MetaValue};
 use serde::Serialize;
 use strum_macros::EnumIter;
 
@@ -39,12 +39,6 @@ impl_db_record!(
 impl_db_lookup!(key = MetaDesiredKey, query_prefix = MetaDesiredKeyPrefix,);
 #[derive(Debug, Clone, Encodable, Decodable, Eq, PartialEq, Hash, Serialize)]
 pub struct MetaConsensusKey(pub MetaKey);
-
-#[derive(Debug, Encodable, Decodable, Serialize)]
-pub struct MetaConsensusValue {
-    pub revision: u64,
-    pub value: MetaValue,
-}
 
 #[derive(Debug, Encodable, Decodable)]
 pub struct MetaConsensusKeyPrefix;

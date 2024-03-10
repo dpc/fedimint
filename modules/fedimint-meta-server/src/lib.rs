@@ -1,14 +1,10 @@
 pub mod db;
-pub mod endpoint;
 
 use std::collections::BTreeMap;
 use std::future;
 
 use async_trait::async_trait;
 use db::{MetaConsensusKey, MetaDesiredKey, MetaSubmissionsByKeyPrefix, MetaSubmissionsKey};
-use endpoint::{
-    GetConsensusRequest, GetSubmissionResponse, GetSubmissionsRequest, GET_SUBMISSIONS_ENDPOINT,
-};
 use fedimint_core::config::{
     ConfigGenModuleParams, DkgResult, ServerModuleConfig, ServerModuleConsensusConfig,
     TypedServerModuleConfig, TypedServerModuleConsensusConfig,
@@ -31,22 +27,22 @@ use fedimint_core::{
 use fedimint_logging::LOG_SERVER_MODULE_META;
 use fedimint_meta_common::config::{
     MetaClientConfig, MetaConfig, MetaConfigConsensus, MetaConfigLocal, MetaConfigPrivate,
-    MetaGenParams,
+};
+pub use fedimint_meta_common::config::{MetaGenParams, MetaGenParamsConsensus, MetaGenParamsLocal};
+use fedimint_meta_common::endpoint::{
+    GetConsensusRequest, GetSubmissionResponse, GetSubmissionsRequest, SubmitRequest,
+    GET_CONSENSUS_ENDPOINT, GET_CONSENSUS_REV_ENDPOINT, GET_SUBMISSIONS_ENDPOINT, SUBMIT_ENDPOINT,
 };
 use fedimint_meta_common::{
-    MetaCommonInit, MetaConsensusItem, MetaInput, MetaInputError, MetaKey, MetaModuleTypes,
-    MetaOutput, MetaOutputError, MetaOutputOutcome, MetaValue, CONSENSUS_VERSION,
+    MetaCommonInit, MetaConsensusItem, MetaConsensusValue, MetaInput, MetaInputError, MetaKey,
+    MetaModuleTypes, MetaOutput, MetaOutputError, MetaOutputOutcome, MetaValue, CONSENSUS_VERSION,
 };
 use futures::StreamExt;
 use strum::IntoEnumIterator;
 use tracing::{debug, info};
 
 use crate::db::{
-    DbKeyPrefix, MetaConsensusKeyPrefix, MetaConsensusValue, MetaDesiredKeyPrefix,
-    MetaSubmissionsKeyPrefix,
-};
-use crate::endpoint::{
-    SubmitRequest, GET_CONSENSUS_ENDPOINT, GET_CONSENSUS_REV_ENDPOINT, SUBMIT_ENDPOINT,
+    DbKeyPrefix, MetaConsensusKeyPrefix, MetaDesiredKeyPrefix, MetaSubmissionsKeyPrefix,
 };
 
 /// Generates the module

@@ -1,3 +1,9 @@
+pub mod api;
+#[cfg(feature = "cli")]
+pub mod cli;
+pub mod db;
+pub mod states;
+
 use std::collections::BTreeMap;
 
 use db::DbKeyPrefix;
@@ -17,10 +23,6 @@ use fedimint_meta_common::config::MetaClientConfig;
 use fedimint_meta_common::{MetaCommonInit, MetaModuleTypes};
 use states::MetaStateMachine;
 use strum::IntoEnumIterator;
-
-pub mod api;
-pub mod db;
-pub mod states;
 
 #[derive(Debug)]
 pub struct MetaClientModule {
@@ -75,6 +77,14 @@ impl ClientModule for MetaClientModule {
 
     async fn get_balance(&self, _dbtx: &mut DatabaseTransaction<'_>) -> Amount {
         Amount::ZERO
+    }
+
+    #[cfg(feature = "cli")]
+    async fn handle_cli_command(
+        &self,
+        args: &[std::ffi::OsString],
+    ) -> anyhow::Result<serde_json::Value> {
+        cli::handle_cli_command(self, args).await
     }
 }
 

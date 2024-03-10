@@ -1,3 +1,5 @@
+pub mod endpoint;
+
 use std::fmt;
 
 use config::MetaClientConfig;
@@ -15,7 +17,7 @@ use thiserror::Error;
 pub mod config;
 
 /// Unique name for this module
-pub const KIND: ModuleKind = ModuleKind::from_static_str("dummy");
+pub const KIND: ModuleKind = ModuleKind::from_static_str("meta");
 
 /// Modules are non-compatible with older versions
 pub const CONSENSUS_VERSION: ModuleConsensusVersion = ModuleConsensusVersion::new(0, 0);
@@ -122,6 +124,13 @@ impl<'de> Deserialize<'de> for MetaValue {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Encodable, Decodable)]
 pub struct MetaConsensusItem {
     pub key: MetaKey,
+    pub value: MetaValue,
+}
+
+/// A [`MetaValue`] in a consensus (which means it has a revision number)
+#[derive(Debug, Clone, Encodable, Decodable, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MetaConsensusValue {
+    pub revision: u64,
     pub value: MetaValue,
 }
 

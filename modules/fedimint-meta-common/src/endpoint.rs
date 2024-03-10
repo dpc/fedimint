@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 
 use fedimint_core::PeerId;
-use fedimint_meta_common::{MetaKey, MetaValue};
 use serde::{Deserialize, Serialize};
+
+use crate::{MetaKey, MetaValue};
 
 /// Submit a change of value for a given key. Guardians only.
 pub const SUBMIT_ENDPOINT: &str = "submit";

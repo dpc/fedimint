@@ -33,6 +33,7 @@ use fedimint_core::util::{handle_version_hash_command, SafeUrl};
 use fedimint_core::{fedimint_build_code_version_env, task, PeerId, TieredMulti};
 use fedimint_ln_client::LightningClientInit;
 use fedimint_logging::{TracingSetup, LOG_CLIENT};
+use fedimint_meta_client::MetaClientInit;
 use fedimint_mint_client::{MintClientInit, MintClientModule, SpendableNote};
 use fedimint_server::config::io::SALT_FILE;
 use fedimint_wallet_client::api::WalletFederationApi;
@@ -497,6 +498,7 @@ impl FedimintCli {
         self.with_module(LightningClientInit)
             .with_module(MintClientInit)
             .with_module(WalletClientInit::default())
+            .with_module(MetaClientInit)
     }
 
     pub async fn run(&mut self) {
