@@ -1,6 +1,7 @@
 pub mod endpoint;
 
 use std::fmt;
+use std::str::FromStr;
 
 use config::MetaClientConfig;
 use fedimint_core::core::{Decoder, ModuleInstanceId, ModuleKind};
@@ -50,6 +51,13 @@ impl fmt::Display for MetaKey {
     }
 }
 
+impl FromStr for MetaKey {
+    type Err = <u8 as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(FromStr::from_str(s)?))
+    }
+}
 /// A value of the [`MetaKey`] peers are trying to establish consensus on
 ///
 /// Mostly a newtype around a `Vec<u8>` as meta module does not ever interpret
@@ -62,6 +70,10 @@ impl MetaValue {
     /// Maximum size of a [`MetaValue`]
     /// More than 1MB would lead to problems.
     pub const MAX_LEN_BYTES: usize = 1024 * 1024 * 1024;
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
 }
 
 impl Decodable for MetaValue {

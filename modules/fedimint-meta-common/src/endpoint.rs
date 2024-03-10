@@ -25,13 +25,9 @@ pub struct SubmitRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct GetConsensusRequest {
-    pub key: MetaKey,
-}
+pub struct GetConsensusRequest(pub MetaKey);
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct GetSubmissionsRequest {
-    pub key: MetaKey,
-}
+pub struct GetSubmissionsRequest(pub MetaKey);
 
 pub type GetSubmissionResponse = BTreeMap<PeerId, MetaValue>;

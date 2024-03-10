@@ -33,7 +33,7 @@ use time::format_description::well_known::iso8601;
 use time::OffsetDateTime;
 use tracing::{debug, info, warn};
 
-use crate::{metadata_from_clap_cli, LnInvoiceResponse};
+use crate::{metadata_from_clap_cli, LnInvoiceResponse, Opts};
 
 #[derive(Debug, Clone)]
 pub enum ModuleSelector {
@@ -179,6 +179,7 @@ pub fn parse_gateway_id(s: &str) -> Result<secp256k1::PublicKey, secp256k1::Erro
 }
 
 pub async fn handle_command(
+    cli: &Opts,
     command: ClientCmd,
     client: ClientHandle,
 ) -> anyhow::Result<serde_json::Value> {
@@ -594,6 +595,8 @@ pub async fn handle_command(
                     .get_first_instance(&kind)
                     .context("No module with this kind found")?,
             };
+
+            let auth = cli.admin_client_opt(client.get_config())?;
 
             client
                 .get_module_client_dyn(module_instance_id)

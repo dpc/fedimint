@@ -14,17 +14,17 @@ pub struct MetaGenParams {
 
 /// Local parameters for config generation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MetaGenParamsLocal {}
+pub struct MetaGenParamsLocal;
 
 /// Consensus parameters for config generation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MetaGenParamsConsensus {}
+pub struct MetaGenParamsConsensus;
 
 impl Default for MetaGenParams {
     fn default() -> Self {
         Self {
-            local: MetaGenParamsLocal {},
-            consensus: MetaGenParamsConsensus {},
+            local: MetaGenParamsLocal,
+            consensus: MetaGenParamsConsensus,
         }
     }
 }
@@ -39,15 +39,15 @@ pub struct MetaConfig {
 
 /// Contains all the configuration for the client
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Encodable, Decodable, Hash)]
-pub struct MetaClientConfig {}
+pub struct MetaClientConfig;
 
 /// Locally unencrypted config unique to each member
 #[derive(Clone, Debug, Serialize, Deserialize, Decodable, Encodable)]
-pub struct MetaConfigLocal {}
+pub struct MetaConfigLocal;
 
 /// Will be the same for every federation member
 #[derive(Clone, Debug, Serialize, Deserialize, Decodable, Encodable)]
-pub struct MetaConfigConsensus {}
+pub struct MetaConfigConsensus;
 
 /// Will be encrypted and not shared such as private key material
 #[derive(Clone, Debug, Serialize, Deserialize)]

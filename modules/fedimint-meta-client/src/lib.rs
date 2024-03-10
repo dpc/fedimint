@@ -12,6 +12,7 @@ use fedimint_client::module::init::{ClientModuleInit, ClientModuleInitArgs};
 use fedimint_client::module::recovery::NoModuleBackup;
 use fedimint_client::module::{ClientContext, ClientModule, IClientModule};
 use fedimint_client::sm::Context;
+use fedimint_core::api::DynModuleApi;
 use fedimint_core::core::Decoder;
 use fedimint_core::db::{Database, DatabaseTransaction, DatabaseVersion};
 use fedimint_core::module::{
@@ -28,6 +29,7 @@ use strum::IntoEnumIterator;
 pub struct MetaClientModule {
     #[allow(dead_code)]
     cfg: MetaClientConfig,
+    module_api: DynModuleApi,
     #[allow(dead_code)]
     client_ctx: ClientContext<Self>,
     #[allow(dead_code)]
@@ -130,6 +132,7 @@ impl ClientModuleInit for MetaClientInit {
         Ok(MetaClientModule {
             cfg: args.cfg().clone(),
             client_ctx: args.context(),
+            module_api: args.module_api().clone(),
             db: args.db().clone(),
         })
     }

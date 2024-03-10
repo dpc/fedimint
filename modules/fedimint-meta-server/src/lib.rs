@@ -412,7 +412,7 @@ impl Meta {
         dbtx: &mut DatabaseTransaction<'_, NonCommittable>,
         req: &GetConsensusRequest,
     ) -> Result<Option<MetaConsensusValue>, ApiError> {
-        Ok(dbtx.get_value(&MetaConsensusKey(req.key)).await)
+        Ok(dbtx.get_value(&MetaConsensusKey(req.0)).await)
     }
 
     async fn handle_get_consensus_revision_request(
@@ -421,7 +421,7 @@ impl Meta {
         req: &GetConsensusRequest,
     ) -> Result<Option<u64>, ApiError> {
         Ok(dbtx
-            .get_value(&MetaConsensusKey(req.key))
+            .get_value(&MetaConsensusKey(req.0))
             .await
             .map(|cv| cv.revision))
     }
@@ -433,7 +433,7 @@ impl Meta {
         req: &GetSubmissionsRequest,
     ) -> Result<BTreeMap<PeerId, MetaValue>, ApiError> {
         Ok(dbtx
-            .find_by_prefix(&MetaSubmissionsByKeyPrefix(req.key))
+            .find_by_prefix(&MetaSubmissionsByKeyPrefix(req.0))
             .await
             .collect::<Vec<_>>()
             .await

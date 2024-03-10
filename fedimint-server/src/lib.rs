@@ -99,7 +99,7 @@ impl FedimintServer {
             &mut task_group,
         )
         .await
-        .unwrap();
+        .context("Setting up consensus server")?;
 
         info!(target: LOG_CONSENSUS, "Starting consensus API");
 

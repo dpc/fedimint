@@ -273,6 +273,14 @@ impl Opts {
         Self::admin_client_from_id(our_id, cfg)
     }
 
+    fn admin_client_opt(&self, cfg: &ClientConfig) -> CliResult<Option<DynGlobalApi>> {
+        if self.our_id.is_some() {
+            Ok(Some(self.admin_client(cfg)?))
+        } else {
+            Ok(None)
+        }
+    }
+
     fn admin_client_from_id(id: PeerId, cfg: &ClientConfig) -> CliResult<DynGlobalApi> {
         let url = cfg
             .global
@@ -667,7 +675,7 @@ impl FedimintCli {
             Command::Client(command) => {
                 let client = self.client_open(&cli).await?;
                 Ok(CliOutput::Raw(
-                    client::handle_command(command, client)
+                    client::handle_command(&cli, command, client)
                         .await
                         .map_err_cli_msg(CliErrorKind::GeneralFailure, "failure")?,
                 ))

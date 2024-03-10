@@ -69,8 +69,8 @@ pub fn attach_default_module_init_params(
         .append_config_gen_params(
             MetaInit::kind(),
             MetaGenParams {
-                local: MetaGenParamsLocal {},
-                consensus: MetaGenParamsConsensus {},
+                local: MetaGenParamsLocal,
+                consensus: MetaGenParamsConsensus,
             },
         );
 }
