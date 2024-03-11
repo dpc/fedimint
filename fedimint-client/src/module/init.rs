@@ -10,7 +10,7 @@ use fedimint_core::config::{ClientModuleConfig, FederationId, ModuleInitRegistry
 use fedimint_core::core::{Decoder, ModuleInstanceId, ModuleKind};
 use fedimint_core::db::{Database, DatabaseVersion};
 use fedimint_core::module::{
-    ApiVersion, CommonModuleInit, IDynCommonModuleInit, ModuleInit, MultiApiVersion,
+    ApiAuth, ApiVersion, CommonModuleInit, IDynCommonModuleInit, ModuleInit, MultiApiVersion,
 };
 use fedimint_core::task::{MaybeSend, MaybeSync};
 use fedimint_core::{apply, async_trait_maybe_send, dyn_newtype_define, NumPeers};
@@ -39,6 +39,7 @@ where
     module_root_secret: DerivableSecret,
     notifier: ModuleNotifier<<<C as ClientModuleInit>::Module as ClientModule>::States>,
     api: DynGlobalApi,
+    admin_auth: Option<ApiAuth>,
     module_api: DynModuleApi,
     context: ClientContext<<C as ClientModuleInit>::Module>,
 }
@@ -90,6 +91,10 @@ where
         &self.api
     }
 
+    pub fn admin_auth(&self) -> Option<&ApiAuth> {
+        self.admin_auth.as_ref()
+    }
+
     pub fn module_api(&self) -> &DynModuleApi {
         &self.module_api
     }
@@ -120,6 +125,7 @@ where
     module_root_secret: DerivableSecret,
     notifier: ModuleNotifier<<<C as ClientModuleInit>::Module as ClientModule>::States>,
     api: DynGlobalApi,
+    admin_auth: Option<ApiAuth>,
     module_api: DynModuleApi,
     context: ClientContext<<C as ClientModuleInit>::Module>,
     progress_tx: tokio::sync::watch::Sender<RecoveryProgress>,
@@ -170,6 +176,10 @@ where
 
     pub fn api(&self) -> &DynGlobalApi {
         &self.api
+    }
+
+    pub fn admin_auth(&self) -> Option<&ApiAuth> {
+        self.admin_auth.as_ref()
     }
 
     pub fn module_api(&self) -> &DynModuleApi {
@@ -260,6 +270,7 @@ pub trait IClientModuleInit: IDynCommonModuleInit + Debug + MaybeSend + MaybeSyn
         module_root_secret: DerivableSecret,
         notifier: Notifier,
         api: DynGlobalApi,
+        admin_auth: Option<ApiAuth>,
         snapshot: Option<&DynModuleBackup>,
         progress_tx: watch::Sender<RecoveryProgress>,
     ) -> anyhow::Result<()>;
@@ -278,6 +289,7 @@ pub trait IClientModuleInit: IDynCommonModuleInit + Debug + MaybeSend + MaybeSyn
         module_root_secret: DerivableSecret,
         notifier: Notifier,
         api: DynGlobalApi,
+        admin_auth: Option<ApiAuth>,
     ) -> anyhow::Result<DynClientModule>;
 
     fn get_database_migrations(&self) -> BTreeMap<DatabaseVersion, ClientMigrationFn>;
@@ -318,6 +330,7 @@ where
         // TODO: make dyn type for notifier
         notifier: Notifier,
         api: DynGlobalApi,
+        admin_auth: Option<ApiAuth>,
         snapshot: Option<&DynModuleBackup>,
         progress_tx: watch::Sender<RecoveryProgress>,
     ) -> anyhow::Result<()> {
@@ -341,6 +354,7 @@ where
                     module_root_secret,
                     notifier: notifier.module_notifier(instance_id),
                     api: api.clone(),
+                    admin_auth,
                     module_api: api.with_module(instance_id),
                     context: ClientContext {
                         client: final_client,
@@ -369,6 +383,7 @@ where
         // TODO: make dyn type for notifier
         notifier: Notifier,
         api: DynGlobalApi,
+        admin_auth: Option<ApiAuth>,
     ) -> anyhow::Result<DynClientModule> {
         let typed_cfg: &<<T as fedimint_core::module::ModuleInit>::Common as CommonModuleInit>::ClientConfig = cfg.cast()?;
         Ok(self
@@ -382,6 +397,7 @@ where
                 module_root_secret,
                 notifier: notifier.module_notifier(instance_id),
                 api: api.clone(),
+                admin_auth,
                 module_api: api.with_module(instance_id),
                 context: ClientContext {
                     client: final_client,

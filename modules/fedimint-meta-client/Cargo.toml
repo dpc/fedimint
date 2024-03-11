@@ -23,6 +23,7 @@ cli = ["dep:clap", "dep:serde_json"]
 async-trait = "0.1.73"
 anyhow = "1.0.66"
 clap = { workspace = true, optional = true }
+hex = "0.4.3"
 serde_json = { workspace = true, optional = true }
 fedimint-meta-common = { version = "0.3.0-alpha", path = "../fedimint-meta-common" }
 fedimint-client = { version = "0.3.0-alpha", path = "../../fedimint-client" }

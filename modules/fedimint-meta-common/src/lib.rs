@@ -66,6 +66,25 @@ impl FromStr for MetaKey {
 #[derive(Debug, Clone, Encodable, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MetaValue(Vec<u8>);
 
+impl FromStr for MetaValue {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(hex::decode(s)?))
+    }
+}
+
+impl fmt::Display for MetaValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&hex::encode(&self.0))
+    }
+}
+impl From<&[u8]> for MetaValue {
+    fn from(value: &[u8]) -> Self {
+        Self(value.to_vec())
+    }
+}
+
 impl MetaValue {
     /// Maximum size of a [`MetaValue`]
     /// More than 1MB would lead to problems.
@@ -73,6 +92,10 @@ impl MetaValue {
 
     pub fn as_slice(&self) -> &[u8] {
         &self.0
+    }
+
+    pub fn to_json(&self) -> anyhow::Result<serde_json::Value> {
+        Ok(serde_json::from_slice(&self.0)?)
     }
 }
 

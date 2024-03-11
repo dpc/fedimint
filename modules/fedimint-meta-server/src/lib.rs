@@ -199,61 +199,15 @@ pub struct Meta {
 }
 
 impl Meta {
-    async fn is_submitted_value_redundant(
-        dbtx: &mut DatabaseTransaction<'_, NonCommittable>,
-        key: MetaKey,
-        value: &MetaValue,
-        peer_id: PeerId,
-    ) -> bool {
-        // is desired value already submitted?
-        Some(value) == dbtx
-                    .get_value(&MetaSubmissionsKey {
-                        key,
-                        peer_id,
-                    })
-                    .await
-                    .as_ref()
-                ||
-                    // is desired value is already the current consensus?
-                    Some(value) == dbtx.get_value(&MetaConsensusKey(key)).await.as_ref().map(|consensus_value| &consensus_value.value)
-    }
-
-    async fn change_consensus(
-        dbtx: &mut DatabaseTransaction<'_, NonCommittable>,
-        key: MetaKey,
-        value: MetaValue,
-        matching_submissions: Vec<PeerId>,
-    ) {
-        let revision = dbtx
-            .get_value(&MetaConsensusKey(key))
-            .await
-            .map(|cv| cv.revision);
-        dbtx.insert_entry(
-            &MetaConsensusKey(key),
-            &MetaConsensusValue {
-                value,
-                revision: revision.map(|r| r.wrapping_add(1)).unwrap_or_default(),
-            },
-        )
-        .await;
-
-        for peer_id in matching_submissions {
-            dbtx.remove_entry(&MetaSubmissionsKey { key, peer_id })
-                .await;
-        }
-    }
-}
-/// Implementation of consensus for the server module
-#[async_trait]
-impl ServerModule for Meta {
-    /// Define the consensus types
-    type Common = MetaModuleTypes;
-    type Init = MetaInit;
-
-    async fn consensus_proposal(
+    /// Check the difference between what's desired to be submitted and what's
+    /// already submitted or consensus value.
+    ///
+    /// Returns:
+    /// `(items_to_submit, desired_keys_to_delete)`
+    async fn desired_submitted_diff(
         &self,
-        dbtx: &mut DatabaseTransaction<'_>,
-    ) -> Vec<MetaConsensusItem> {
+        dbtx: &mut DatabaseTransaction<'_, NonCommittable>,
+    ) -> (Vec<MetaConsensusItem>, Vec<MetaKey>) {
         let mut to_delete: Vec<MetaKey> = vec![];
         let desired: Vec<_> = dbtx
             .find_by_prefix(&MetaDesiredKeyPrefix)
@@ -272,9 +226,84 @@ impl ServerModule for Meta {
             }
         }
 
-        for key in to_delete {
-            dbtx.remove_entry(&MetaDesiredKey(key)).await;
+        (to_submit, to_delete)
+    }
+    async fn is_submitted_value_redundant(
+        dbtx: &mut DatabaseTransaction<'_, NonCommittable>,
+        key: MetaKey,
+        value: &MetaValue,
+        peer_id: PeerId,
+    ) -> bool {
+        // is desired value already submitted?
+        Some(value) == dbtx
+                    .get_value(&MetaSubmissionsKey {
+                        key,
+                        peer_id,
+                    })
+                    .await
+                    .as_ref()
+                ||
+                    // is desired value is already the current consensus?
+                    Some(value) == Self::get_consensus(dbtx, key).await.as_ref()
+    }
+
+    async fn get_submission(
+        dbtx: &mut DatabaseTransaction<'_>,
+        key: MetaKey,
+        peer_id: PeerId,
+    ) -> Option<MetaValue> {
+        dbtx.get_value(&MetaSubmissionsKey { key, peer_id }).await
+    }
+
+    async fn get_consensus(dbtx: &mut DatabaseTransaction<'_>, key: MetaKey) -> Option<MetaValue> {
+        dbtx.get_value(&MetaConsensusKey(key))
+            .await
+            .map(|consensus_value| consensus_value.value)
+    }
+
+    async fn change_consensus(
+        dbtx: &mut DatabaseTransaction<'_, NonCommittable>,
+        key: MetaKey,
+        value: MetaValue,
+        matching_submissions: Vec<PeerId>,
+    ) {
+        let value_len = value.as_slice().len();
+        let revision = dbtx
+            .get_value(&MetaConsensusKey(key))
+            .await
+            .map(|cv| cv.revision);
+        let revision = revision.map(|r| r.wrapping_add(1)).unwrap_or_default();
+        dbtx.insert_entry(
+            &MetaConsensusKey(key),
+            &MetaConsensusValue { value, revision },
+        )
+        .await;
+
+        info!(target: LOG_SERVER_MODULE_META, %key, rev = %revision, len = %value_len, "New consensus value");
+
+        for peer_id in matching_submissions {
+            dbtx.remove_entry(&MetaSubmissionsKey { key, peer_id })
+                .await;
         }
+    }
+}
+
+/// Implementation of consensus for the server module
+#[async_trait]
+impl ServerModule for Meta {
+    /// Define the consensus types
+    type Common = MetaModuleTypes;
+    type Init = MetaInit;
+
+    async fn consensus_proposal(
+        &self,
+        dbtx: &mut DatabaseTransaction<'_>,
+    ) -> Vec<MetaConsensusItem> {
+        let (to_submit, _to_delete) = self.desired_submitted_diff(dbtx).await;
+
+        // Note: regrettably we can't delete any desired keys here, as it could lead to
+        // write-write db conflicts. So we just let the request handler do the
+        // cleaning.
         to_submit
     }
 
@@ -284,14 +313,24 @@ impl ServerModule for Meta {
         MetaConsensusItem { key, value }: MetaConsensusItem,
         peer_id: PeerId,
     ) -> anyhow::Result<()> {
-        if Self::is_submitted_value_redundant(dbtx, key, &value, peer_id).await {
+        // first of all: any new submission overrides previous submission
+        if let Some(prev_value) = Self::get_submission(dbtx, key, peer_id).await {
+            if prev_value != value {
+                dbtx.remove_entry(&MetaSubmissionsKey { key, peer_id })
+                    .await;
+            }
+        }
+        // then: if the submission is equal to the current consensus, it's ignored
+        if Some(&value) == Self::get_consensus(dbtx, key).await.as_ref() {
             debug!(target: LOG_SERVER_MODULE_META, %peer_id, %key, "Peer submitted a redundant value");
             return Ok(());
         }
 
+        // otherwise, new submission is recorded
         dbtx.insert_entry(&MetaSubmissionsKey { key, peer_id }, &value)
             .await;
 
+        // we check how many peers submitted the same value (including this peer)
         let matching_submissions: Vec<PeerId> = dbtx
             .find_by_prefix(&MetaSubmissionsByKeyPrefix(key))
             .await
@@ -304,9 +343,11 @@ impl ServerModule for Meta {
         info!(target: LOG_SERVER_MODULE_META,
              %peer_id,
              %key,
+            value_len = %value.as_slice().len(),
              matching = %matching_submissions.len(),
             %threshold, "Peer submitted a value");
 
+        // if threshold or more, change the consensus value
         if threshold <= matching_submissions.len() {
             Self::change_consensus(dbtx, key, value, matching_submissions).await;
         }
@@ -404,6 +445,13 @@ impl Meta {
         dbtx.insert_entry(&MetaDesiredKey(req.key), &req.value)
             .await;
 
+        // Since this is the only place in the code that touches "desired" keys, we
+        // clean old keys here as well.
+        let (_to_submit, to_delete) = self.desired_submitted_diff(&mut dbtx.to_ref_nc()).await;
+
+        for key in to_delete {
+            dbtx.remove_entry(&MetaDesiredKey(key)).await;
+        }
         Ok(())
     }
 

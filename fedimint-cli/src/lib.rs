@@ -21,7 +21,7 @@ use fedimint_bip39::Bip39RootSecretStrategy;
 use fedimint_client::module::init::{ClientModuleInit, ClientModuleInitRegistry};
 use fedimint_client::module::ClientModule as _;
 use fedimint_client::secret::{get_default_client_secret, RootSecretStrategy};
-use fedimint_client::{get_invite_code_from_db, Client, ClientBuilder, ClientHandle};
+use fedimint_client::{get_invite_code_from_db, AdminCreds, Client, ClientBuilder, ClientHandle};
 use fedimint_core::api::{
     DynGlobalApi, FederationApiExt, FederationError, IRawFederationApi, InviteCode, WsFederationApi,
 };
@@ -271,14 +271,6 @@ impl Opts {
             .our_id
             .ok_or_cli_msg(CliErrorKind::MissingAuth, "Admin client needs our-id set")?;
         Self::admin_client_from_id(our_id, cfg)
-    }
-
-    fn admin_client_opt(&self, cfg: &ClientConfig) -> CliResult<Option<DynGlobalApi>> {
-        if self.our_id.is_some() {
-            Ok(Some(self.admin_client(cfg)?))
-        } else {
-            Ok(None)
-        }
     }
 
     fn admin_client_from_id(id: PeerId, cfg: &ClientConfig) -> CliResult<DynGlobalApi> {
@@ -558,7 +550,14 @@ impl FedimintCli {
     }
 
     async fn client_open(&mut self, cli: &Opts) -> CliResult<ClientHandle> {
-        let client_builder = self.make_client_builder(cli).await?;
+        let mut client_builder = self.make_client_builder(cli).await?;
+
+        if let Some(our_id) = cli.our_id {
+            client_builder.set_admin_creds(AdminCreds {
+                peer_id: our_id,
+                auth: cli.auth()?,
+            });
+        }
 
         let mnemonic = Mnemonic::from_entropy(
             &Client::load_decodable_client_secret::<Vec<u8>>(client_builder.db())
@@ -675,7 +674,7 @@ impl FedimintCli {
             Command::Client(command) => {
                 let client = self.client_open(&cli).await?;
                 Ok(CliOutput::Raw(
-                    client::handle_command(&cli, command, client)
+                    client::handle_command(command, client)
                         .await
                         .map_err_cli_msg(CliErrorKind::GeneralFailure, "failure")?,
                 ))

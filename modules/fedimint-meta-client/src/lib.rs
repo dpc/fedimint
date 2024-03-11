@@ -6,34 +6,85 @@ pub mod states;
 
 use std::collections::BTreeMap;
 
+use api::MetaFederationApi;
+use common::{MetaConsensusValue, MetaKey, MetaValue};
 use db::DbKeyPrefix;
 use fedimint_client::db::ClientMigrationFn;
 use fedimint_client::module::init::{ClientModuleInit, ClientModuleInitArgs};
 use fedimint_client::module::recovery::NoModuleBackup;
-use fedimint_client::module::{ClientContext, ClientModule, IClientModule};
+use fedimint_client::module::{ClientModule, IClientModule};
 use fedimint_client::sm::Context;
 use fedimint_core::api::DynModuleApi;
 use fedimint_core::core::Decoder;
-use fedimint_core::db::{Database, DatabaseTransaction, DatabaseVersion};
+use fedimint_core::db::{DatabaseTransaction, DatabaseVersion};
 use fedimint_core::module::{
-    ApiVersion, ModuleCommon, ModuleInit, MultiApiVersion, TransactionItemAmount,
+    ApiAuth, ApiVersion, ModuleCommon, ModuleInit, MultiApiVersion, TransactionItemAmount,
 };
-use fedimint_core::{apply, async_trait_maybe_send, Amount};
+use fedimint_core::{apply, async_trait_maybe_send, Amount, PeerId};
 pub use fedimint_meta_common as common;
-use fedimint_meta_common::config::MetaClientConfig;
 use fedimint_meta_common::{MetaCommonInit, MetaModuleTypes};
 use states::MetaStateMachine;
 use strum::IntoEnumIterator;
 
 #[derive(Debug)]
 pub struct MetaClientModule {
-    #[allow(dead_code)]
-    cfg: MetaClientConfig,
     module_api: DynModuleApi,
-    #[allow(dead_code)]
-    client_ctx: ClientContext<Self>,
-    #[allow(dead_code)]
-    db: Database,
+    admin_auth: Option<ApiAuth>,
+}
+
+impl MetaClientModule {
+    fn admin_auth(&self) -> anyhow::Result<ApiAuth> {
+        self.admin_auth
+            .clone()
+            .ok_or_else(|| anyhow::format_err!("Admin auth not set"))
+    }
+
+    /// Submit a meta consensus value
+    ///
+    /// When *threshold* amount of peers submits the exact same value it
+    /// becomes a new consensus value.
+    ///
+    /// To "cancel" previous vote, peer can submit a value equal to the current
+    /// consensus value.
+    pub async fn submit(&self, key: MetaKey, value: MetaValue) -> anyhow::Result<()> {
+        self.module_api
+            .submit(key, value, self.admin_auth()?)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Get the current meta consensus value along with it's revision
+    ///
+    /// See [`Self::get_consensus_value_rev`] to use when checking for updates.
+    pub async fn get_consensus_value(
+        &self,
+        key: MetaKey,
+    ) -> anyhow::Result<Option<MetaConsensusValue>> {
+        Ok(self.module_api.get_consensus(key).await?)
+    }
+
+    /// Get the current meta consensus value revision
+    ///
+    /// Each time a meta consensus value changes, the revision increases,
+    /// so checking just the revision can save a lot of bandwidth in periodic
+    /// checks.
+    pub async fn get_consensus_value_rev(&self, key: MetaKey) -> anyhow::Result<Option<u64>> {
+        Ok(self.module_api.get_consensus_rev(key).await?)
+    }
+
+    /// Get current submissions to change the meta consensus value.
+    ///
+    /// Upon changing the consensus
+    pub async fn get_submissions(
+        &self,
+        key: MetaKey,
+    ) -> anyhow::Result<BTreeMap<PeerId, MetaValue>> {
+        Ok(self
+            .module_api
+            .get_submissions(key, self.admin_auth()?)
+            .await?)
+    }
 }
 
 /// Data needed by the state machine
@@ -130,10 +181,8 @@ impl ClientModuleInit for MetaClientInit {
 
     async fn init(&self, args: &ClientModuleInitArgs<Self>) -> anyhow::Result<Self::Module> {
         Ok(MetaClientModule {
-            cfg: args.cfg().clone(),
-            client_ctx: args.context(),
             module_api: args.module_api().clone(),
-            db: args.db().clone(),
+            admin_auth: args.admin_auth().cloned(),
         })
     }
 
