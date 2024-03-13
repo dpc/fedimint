@@ -1,9 +1,10 @@
 name: fedimint-dev
-root: .
 socket_name: fedimint-dev
+attach: false
+tmux_detached: true
+root: .
 pre_window:
   - source scripts/dev/aliases.sh
-tmux_detached: false
 windows:
   - main:
       panes:
