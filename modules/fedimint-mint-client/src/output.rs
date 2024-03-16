@@ -224,12 +224,14 @@ impl MintOutputStatesCreated {
             _ => panic!("Unexpected prior state"),
         };
 
-        let agg_blind_signature = aggregate_signature_shares(
-            &blinded_signature_shares
-                .into_iter()
-                .map(|(peer, share)| (peer.to_usize() as u64 + 1, share))
-                .collect(),
-        );
+        let agg_blind_signature = fedimint_core::task::block_in_place(|| {
+            aggregate_signature_shares(
+                &blinded_signature_shares
+                    .into_iter()
+                    .map(|(peer, share)| (peer.to_usize() as u64 + 1, share))
+                    .collect(),
+            )
+        });
 
         let amount_key = tbs_pks
             .tier(&created.amount)
