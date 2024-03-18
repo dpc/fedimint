@@ -265,7 +265,7 @@ impl Lightningd {
         let process = Lightningd::start(process_mgr, cln_dir).await?;
 
         let socket_cln = cln_dir.join("regtest/lightning-rpc");
-        poll("lightningd", Duration::from_secs(15), || async {
+        poll("lightningd", Duration::from_secs(30), || async {
             ClnRpc::new(socket_cln.clone())
                 .await
                 .context("connect to lightningd")
@@ -355,7 +355,7 @@ impl Lnd {
             process,
         };
         // wait for lnd rpc to be active
-        poll("lnd_startup", Duration::from_secs(15), || async {
+        poll("lnd_startup", Duration::from_secs(30), || async {
             this.pub_key().await.map_err(ControlFlow::Continue)
         })
         .await?;
