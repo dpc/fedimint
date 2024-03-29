@@ -9,6 +9,7 @@ pub use external::{
 };
 use futures::Future;
 pub use gatewayd::Gatewayd;
+use tests::log_binary_versions;
 use util::ProcessManager;
 
 pub mod cli;
@@ -30,6 +31,7 @@ where
     let args = cli::CommonArgs::parse_from::<_, ffi::OsString>(vec![]);
 
     let (process_mgr, task_group) = cli::setup(args).await?;
+    log_binary_versions().await?;
     cleanup_on_exit(f(process_mgr), task_group).await?;
     Ok(())
 }
