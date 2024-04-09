@@ -125,7 +125,7 @@ impl IBitcoindRpc for ElectrumClient {
         Ok(results)
     }
 
-    async fn get_txout_proof(&self, _txid: Txid) -> anyhow::Result<TxOutProof> {
+    async fn get_txout_proof(&self, _txid: &Txid) -> anyhow::Result<TxOutProof> {
         // FIXME: Not sure how to implement for electrum yet, but the client cannot use
         // electrum regardless right now
         unimplemented!()

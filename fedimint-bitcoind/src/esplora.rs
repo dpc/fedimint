@@ -120,10 +120,10 @@ impl IBitcoindRpc for EsploraClient {
 
         Ok(transactions)
     }
-    async fn get_txout_proof(&self, txid: Txid) -> anyhow::Result<TxOutProof> {
+    async fn get_txout_proof(&self, txid: &Txid) -> anyhow::Result<TxOutProof> {
         let proof = self
             .0
-            .get_merkle_block(&txid)
+            .get_merkle_block(txid)
             .await?
             .ok_or(format_err!("No merkle proof found"))?;
 

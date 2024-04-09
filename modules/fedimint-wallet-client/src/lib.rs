@@ -187,7 +187,7 @@ impl ClientModuleInit for WalletClientInit {
             module_root_secret: random_root_secret,
             module_api: args.module_api().clone(),
             notifier: args.notifier().clone(),
-            rpc: create_bitcoind(&rpc_config, TaskGroup::new().make_handle())?,
+            rpc: create_bitcoind(&rpc_config, args.task_group().make_handle())?,
             secp: Default::default(),
             client_ctx: args.context(),
         })
@@ -198,7 +198,16 @@ impl ClientModuleInit for WalletClientInit {
         args: &ClientModuleRecoverArgs<Self>,
         snapshot: Option<&<Self::Module as ClientModule>::Backup>,
     ) -> anyhow::Result<()> {
-        WalletRecovery::recover(args, snapshot).await
+        let rpc_config = self
+            .0
+            .clone()
+            .unwrap_or(WalletClientModule::get_rpc_config(args.cfg()));
+        WalletRecovery::recover(
+            args,
+            create_bitcoind(&rpc_config, args.task_group().make_handle())?,
+            snapshot,
+        )
+        .await
     }
 }
 
@@ -311,7 +320,7 @@ impl WalletClientModule {
     }
 
     pub async fn get_deposit_address_inner(
-        self,
+        &self,
         valid_until: SystemTime,
         dbtx: &mut DatabaseTransaction<'_>,
     ) -> (OperationId, WalletClientStates, Address) {

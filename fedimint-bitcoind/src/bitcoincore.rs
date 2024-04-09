@@ -123,9 +123,9 @@ impl IBitcoindRpc for BitcoinClient {
         Ok(results)
     }
 
-    async fn get_txout_proof(&self, txid: Txid) -> anyhow::Result<TxOutProof> {
+    async fn get_txout_proof(&self, txid: &Txid) -> anyhow::Result<TxOutProof> {
         TxOutProof::consensus_decode(
-            &mut Cursor::new(block_in_place(|| self.0.get_tx_out_proof(&[txid], None))?),
+            &mut Cursor::new(block_in_place(|| self.0.get_tx_out_proof(&[*txid], None))?),
             &ModuleDecoderRegistry::default(),
         )
         .map_err(|error| format_err!("Could not decode tx: {}", error))

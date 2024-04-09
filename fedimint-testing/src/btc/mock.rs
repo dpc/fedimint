@@ -313,9 +313,9 @@ impl IBitcoindRpc for FakeBitcoinTest {
         Ok(script.unwrap_or(&vec![]).clone())
     }
 
-    async fn get_txout_proof(&self, txid: Txid) -> BitcoinRpcResult<TxOutProof> {
+    async fn get_txout_proof(&self, txid: &Txid) -> BitcoinRpcResult<TxOutProof> {
         let proofs = self.proofs.lock().unwrap();
-        let proof = proofs.get(&txid);
+        let proof = proofs.get(txid);
         Ok(proof.ok_or(format_err!("No proof stored"))?.clone())
     }
 }

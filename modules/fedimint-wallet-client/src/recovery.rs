@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use fedimint_bitcoind::{DynBitcoindRpc, IBitcoindRpcExt as _};
+use fedimint_bitcoind::{create_bitcoind, DynBitcoindRpc, IBitcoindRpcExt as _};
 use fedimint_client::derivable_secret::{ChildId, DerivableSecret};
 use fedimint_client::module::init::ClientModuleRecoverArgs;
 use fedimint_client::module::recovery::{DynModuleBackup, ModuleBackup};
@@ -9,6 +9,7 @@ use fedimint_core::core::{IntoDynInstance, ModuleInstanceId};
 use fedimint_core::db::{DatabaseTransaction, IDatabaseTransactionOpsCoreTyped as _};
 use fedimint_core::encoding::{Decodable, Encodable};
 use fedimint_core::task::sleep;
+use fedimint_core::transaction::Transaction;
 use fedimint_wallet_common::config::WalletClientConfig;
 use fedimint_wallet_common::tweakable::Tweakable as _;
 use fedimint_wallet_common::PegInDescriptor;
@@ -62,6 +63,7 @@ pub struct WalletRecovery {
 impl WalletRecovery {
     pub async fn recover(
         args: &ClientModuleRecoverArgs<WalletClientInit>,
+        rpc: DynBitcoindRpc,
         _snapshot: Option<&WalletBackup>,
     ) -> anyhow::Result<()> {
         args.db().ensure_isolated().expect("must be isolated db");
@@ -80,6 +82,7 @@ impl WalletRecovery {
 
         let cfg = args.cfg().to_owned();
         let mut s = Self {
+            rpc,
             state,
             wallet_descriptor: cfg.peg_in_descriptor.clone(),
             module_record_secret: args.module_root_secret().clone(),
@@ -117,7 +120,7 @@ impl WalletRecovery {
         dbtx.insert_entry(&RecoveryStateKey, state).await;
     }
 
-    async fn check_for_on_chain_deposit(&self, deposit_idx: u64) -> Vec<(Transactoin, u32)> {
+    async fn check_for_on_chain_deposit(&self, deposit_idx: u64) -> Vec<(Transaction, u32)> {
         let (secret_tweak_key, public_tweak_key, address, operation_id) =
             WalletClientModule::derive_deposit_address_static(
                 &self.cfg,
@@ -137,5 +140,7 @@ impl WalletRecovery {
             let height = self.rpc.get_tx_block_height_retry(&tx.txid()).await;
             // let self.rpc
         }
+
+        todo!()
     }
 }

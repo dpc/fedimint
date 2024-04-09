@@ -144,7 +144,7 @@ pub trait IBitcoindRpc: Debug {
     async fn get_script_history(&self, script: &Script) -> Result<Vec<Transaction>>;
 
     /// Returns a proof that a tx is included in the bitcoin blockchain
-    async fn get_txout_proof(&self, txid: Txid) -> Result<TxOutProof>;
+    async fn get_txout_proof(&self, txid: &Txid) -> Result<TxOutProof>;
 }
 
 /// Extension trait over [`IBitcoindRpc`] adding some commonly needed logic
@@ -160,7 +160,7 @@ pub trait IBitcoindRpcExt {
     /// outputs
     async fn get_script_history_outputs_retry(&self, script: &Script) -> Vec<(Transaction, u32)>;
     /// Like [`IBitcoindRpc::get_txout_proof`] but retries until success
-    async fn get_txout_proof_retry(&self, txid: Txid) -> TxOutProof;
+    async fn get_txout_proof_retry(&self, txid: &Txid) -> TxOutProof;
     /// Like [`Self::get_script_history_outputs_retry`], but will not return
     /// empty vec
     async fn wait_script_history_outputs_retry(&self, script: &Script) -> Vec<(Transaction, u32)>;
@@ -192,7 +192,7 @@ where
         }
     }
 
-    async fn get_txout_proof_retry(&self, txid: Txid) -> TxOutProof {
+    async fn get_txout_proof_retry(&self, txid: &Txid) -> TxOutProof {
         loop {
             match self.get_txout_proof(txid).await {
                 Ok(o) => return o,
@@ -231,6 +231,7 @@ where
             })
             .collect()
     }
+
     async fn wait_script_history_outputs_retry(&self, script: &Script) -> Vec<(Transaction, u32)> {
         loop {
             let res = self.get_script_history_outputs_retry(script).await;
@@ -267,8 +268,13 @@ impl IBitcoindRpcExt for DynBitcoindRpc {
             .wait_script_history_outputs_retry(script)
             .await
     }
-    async fn get_txout_proof_retry(&self, txid: Txid) -> Result<TxOutProof> {
-        ops::Deref::deref(self).get_txout_proof_retry(script).await
+    async fn get_txout_proof_retry(&self, txid: &Txid) -> TxOutProof {
+        ops::Deref::deref(self).get_txout_proof_retry(txid).await
+    }
+    async fn get_tx_block_height_retry(&self, txid: &Txid) -> Option<u64> {
+        ops::Deref::deref(self)
+            .get_tx_block_height_retry(txid)
+            .await
     }
 }
 
@@ -364,7 +370,7 @@ where
             .await
     }
 
-    async fn get_txout_proof(&self, txid: Txid) -> Result<TxOutProof> {
+    async fn get_txout_proof(&self, txid: &Txid) -> Result<TxOutProof> {
         self.retry_call(|| async { self.inner.get_txout_proof(txid).await })
             .await
     }

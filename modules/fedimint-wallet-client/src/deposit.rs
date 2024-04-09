@@ -218,7 +218,7 @@ async fn await_btc_transaction_confirmed(
         // Get txout proof
         let txout_proof = match context
             .rpc
-            .get_txout_proof(waiting_state.btc_transaction.txid())
+            .get_txout_proof(&waiting_state.btc_transaction.txid())
             .await
         {
             Ok(txout_proof) => txout_proof,
