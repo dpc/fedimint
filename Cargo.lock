@@ -2946,6 +2946,7 @@ dependencies = [
  "fedimint-logging",
  "fedimint-metrics",
  "fedimint-portalloc",
+ "fedimint-rocksdb",
  "fedimint-tbs",
  "fedimint-testing-core",
  "fedimint-threshold-crypto",

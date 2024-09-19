@@ -32,6 +32,7 @@ fedimint-api-client = { workspace = true }
 fedimint-core = { workspace = true }
 fedimint-logging = { workspace = true }
 fedimint-metrics = { workspace = true }
+fedimint-rocksdb = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
