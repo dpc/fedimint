@@ -1297,7 +1297,7 @@ mod iroh {
             let response = serde_json::from_slice::<Result<Value, ApiError>>(&response)
                 .map_err(|e| PeerError::InvalidResponse(e.into()))?;
 
-            response.map_err(|e| PeerError::InvalidResponse(anyhow::anyhow!("Api Error: {:?}", e)))
+            response.map_err(|e| PeerError::InvalidResponse(anyhow::anyhow!("Api Error: {:#}", e)))
         }
 
         async fn await_disconnection(&self) {

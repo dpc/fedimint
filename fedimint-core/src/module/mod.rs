@@ -185,6 +185,12 @@ impl ApiError {
     }
 }
 
+impl fmt::Display for ApiError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!("{} - {}", self.code, self.message))
+    }
+}
+
 /// State made available to all API endpoints for handling a request
 pub struct ApiEndpointContext<'dbtx> {
     db: Database,

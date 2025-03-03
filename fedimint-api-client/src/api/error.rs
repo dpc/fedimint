@@ -122,7 +122,7 @@ pub struct FederationError {
 
 impl Display for FederationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("Federation rpc error {")?;
+        f.write_str("Federation rpc error { ")?;
         if let Some(general) = self.general.as_ref() {
             f.write_fmt(format_args!("method => {}, ", self.method))?;
             f.write_fmt(format_args!(
@@ -135,12 +135,12 @@ impl Display for FederationError {
             }
         }
         for (i, (peer, e)) in self.peer_errors.iter().enumerate() {
-            f.write_fmt(format_args!("{peer} => {e:#})"))?;
-            if i == self.peer_errors.len() - 1 {
+            f.write_fmt(format_args!("{peer} => {e:#}"))?;
+            if i != self.peer_errors.len() - 1 {
                 f.write_str(", ")?;
             }
         }
-        f.write_str("}")?;
+        f.write_str(" }")?;
         Ok(())
     }
 }
