@@ -558,6 +558,7 @@ async fn run(
         code_version_str,
         &module_inits,
         task_group.clone(),
+        Box::new(|backend, ui_bind| fedimint_server_ui::start_web_ui(backend, ui_bind)),
     ))
     .await
 }

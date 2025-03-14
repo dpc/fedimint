@@ -22,7 +22,7 @@ use fedimint_core::module::{
     api_endpoint,
 };
 use fedimint_logging::LOG_SERVER;
-use fedimint_server_core::net::check_auth;
+use fedimint_server_core::net::{NetworkingStack, check_auth};
 use iroh::SecretKey;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
@@ -32,7 +32,7 @@ use tokio_rustls::rustls;
 use tracing::warn;
 
 use super::PeerEndpoints;
-use crate::config::{ConfigGenParams, ConfigGenSettings, NetworkingStack, PeerConnectionInfo};
+use crate::config::{ConfigGenParams, ConfigGenSettings, PeerConnectionInfo};
 use crate::net::api::HasApiContext;
 use crate::net::p2p_connector::gen_cert_and_key;
 

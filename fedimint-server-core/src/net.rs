@@ -1,4 +1,5 @@
 use fedimint_core::module::{ApiEndpointContext, ApiError, ApiResult};
+use serde::{Deserialize, Serialize};
 
 /// A token proving the the API call was authenticated
 ///
@@ -14,4 +15,12 @@ pub fn check_auth(context: &mut ApiEndpointContext) -> ApiResult<GuardianAuthTok
     } else {
         Err(ApiError::unauthorized())
     }
+}
+
+/// The type of networking `fedimintd` should use
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub enum NetworkingStack {
+    #[default]
+    Tcp,
+    Iroh,
 }

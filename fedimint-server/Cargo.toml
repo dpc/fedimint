@@ -24,8 +24,6 @@ aleph-bft = { package = "fedimint-aleph-bft", version = "0.36.0", default-featur
 anyhow = { workspace = true }
 async-channel = { workspace = true }
 async-trait = { workspace = true }
-axum = "0.8.1"
-axum-extra = { version = "0.10.0", features = ["cookie"] }
 base64 = { workspace = true }
 bincode = { workspace = true }
 bitcoin = { workspace = true }
@@ -39,6 +37,7 @@ fedimint-core = { workspace = true }
 fedimint-logging = { workspace = true }
 fedimint-metrics = { workspace = true }
 fedimint-server-core = { workspace = true }
+fedimint-server-ui-common = { workspace = true }
 futures = { workspace = true }
 group = { workspace = true }
 hex = { workspace = true }
@@ -47,7 +46,6 @@ iroh = { workspace = true, features = ["discovery-pkarr-dht"] }
 iroh-base = { workspace = true }
 itertools = { workspace = true }
 jsonrpsee = { version = "0.24.8", features = ["server"] }
-maud = "0.27.0"
 parity-scale-codec = "3.7.4"
 pin-project = "1.1.10"
 rand = { workspace = true }

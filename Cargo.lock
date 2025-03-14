@@ -3742,8 +3742,6 @@ dependencies = [
  "anyhow",
  "async-channel 2.3.1",
  "async-trait",
- "axum 0.8.1",
- "axum-extra",
  "base64 0.22.1",
  "bincode",
  "bitcoin",
@@ -3759,6 +3757,7 @@ dependencies = [
  "fedimint-logging",
  "fedimint-metrics",
  "fedimint-server-core",
+ "fedimint-server-ui-common",
  "futures",
  "group",
  "hex",
@@ -3767,7 +3766,6 @@ dependencies = [
  "iroh-base",
  "itertools 0.13.0",
  "jsonrpsee",
- "maud",
  "parity-scale-codec",
  "pin-project",
  "rand 0.8.5",
@@ -3800,6 +3798,7 @@ dependencies = [
  "fedimint-core",
  "futures",
  "group",
+ "serde",
  "tokio",
 ]
 
@@ -3821,6 +3820,30 @@ dependencies = [
  "strum 0.26.3",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "fedimint-server-ui"
+version = "0.7.0-alpha"
+dependencies = [
+ "axum 0.8.1",
+ "axum-extra",
+ "fedimint-core",
+ "fedimint-server-core",
+ "fedimint-server-ui-common",
+ "maud",
+ "serde",
+ "test-log",
+ "tokio",
+ "tower 0.4.13",
+]
+
+[[package]]
+name = "fedimint-server-ui-common"
+version = "0.7.0-alpha"
+dependencies = [
+ "anyhow",
+ "async-trait",
 ]
 
 [[package]]
@@ -4174,6 +4197,7 @@ dependencies = [
  "fedimint-mint-server",
  "fedimint-rocksdb",
  "fedimint-server",
+ "fedimint-server-ui",
  "fedimint-unknown-common",
  "fedimint-unknown-server",
  "fedimint-wallet-server",

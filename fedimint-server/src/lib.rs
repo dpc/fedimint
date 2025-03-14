@@ -41,6 +41,7 @@ use fedimint_core::util::write_new;
 use fedimint_logging::{LOG_CONSENSUS, LOG_CORE};
 pub use fedimint_server_core as core;
 use fedimint_server_core::ServerModuleInitRegistry;
+use fedimint_server_ui_common::WebUiStartFn;
 use jsonrpsee::RpcModule;
 use net::api::ApiSecrets;
 use net::p2p_connector::IrohConnector;
@@ -77,6 +78,7 @@ pub async fn run(
     code_version_str: String,
     module_init_registry: &ServerModuleInitRegistry,
     task_group: TaskGroup,
+    web_ui_start_fn: WebUiStartFn,
 ) -> anyhow::Result<()> {
     let (cfg, connections, p2p_status_receivers) = match get_config(&data_dir)? {
         Some(cfg) => {
@@ -123,6 +125,7 @@ pub async fn run(
                 &task_group,
                 code_version_str.clone(),
                 force_api_secrets.clone(),
+                web_ui_start_fn,
             ))
             .await?
         }
@@ -206,6 +209,7 @@ pub async fn run_config_gen(
     task_group: &TaskGroup,
     code_version_str: String,
     api_secrets: ApiSecrets,
+    web_ui_start_fn: WebUiStartFn,
 ) -> anyhow::Result<(
     ServerConfig,
     DynP2PConnections<P2PMessage>,
@@ -219,10 +223,7 @@ pub async fn run_config_gen(
 
     let config_gen = ConfigGenApi::new(settings.clone(), db.clone(), cgp_sender);
 
-    task_group.spawn_cancellable(
-        "web-ui",
-        config::web_ui::start_web_ui(config_gen.clone(), settings.ui_bind),
-    );
+    task_group.spawn_cancellable("web-ui", web_ui_start_fn(todo!(), settings.ui_bind));
 
     let mut rpc_module = RpcModule::new(config_gen);
 

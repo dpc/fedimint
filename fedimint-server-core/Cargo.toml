@@ -24,3 +24,4 @@ fedimint-core = { workspace = true }
 futures = { workspace = true }
 group = { workspace = true }
 tokio = { workspace = true }
+serde = { workspace = true }

@@ -1,0 +1,69 @@
+[package]
+name = "fedimint-server-ui"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+description = "fedimint-server' facilitates federated consensus with atomic broadcast and distributed configuration."
+license = { workspace = true }
+readme = { workspace = true }
+repository = { workspace = true }
+
+[package.metadata.docs.rs]
+rustc-args = ["--cfg", "tokio_unstable"]
+
+
+[lib]
+name = "fedimint_server_ui"
+path = "src/lib.rs"
+
+[dependencies]
+# aleph-bft = { package = "fedimint-aleph-bft", version = "0.36.0", default-features = false }
+# anyhow = { workspace = true }
+# async-channel = { workspace = true }
+# async-trait = { workspace = true }
+axum = "0.8.1"
+axum-extra = { version = "0.10.0", features = ["cookie"] }
+# base64 = { workspace = true }
+# bincode = { workspace = true }
+# bitcoin = { workspace = true }
+# bitcoincore-rpc = { workspace = true }
+# bls12_381 = { workspace = true }
+# bytes = { workspace = true }
+# fedimint-aead = { workspace = true }
+# fedimint-api-client = { workspace = true }
+# fedimint-bitcoind = { workspace = true, features = ["fedimint-server"] }
+fedimint-core = { workspace = true }
+# fedimint-logging = { workspace = true }
+# fedimint-metrics = { workspace = true }
+fedimint-server-core = { workspace = true }
+fedimint-server-ui-common = { workspace = true }
+# futures = { workspace = true }
+# group = { workspace = true }
+# hex = { workspace = true }
+# hyper = { workspace = true }
+# iroh = { workspace = true, features = ["discovery-pkarr-dht"] }
+# iroh-base = { workspace = true }
+# itertools = { workspace = true }
+# jsonrpsee = { version = "0.24.8", features = ["server"] }
+maud = "0.27.0"
+# parity-scale-codec = "3.7.4"
+# pin-project = "1.1.10"
+# rand = { workspace = true }
+# rand_chacha = { workspace = true }
+# rayon = { workspace = true }
+# rcgen = "=0.13.2"
+serde = { workspace = true }
+# serde_json = { workspace = true }
+# sha3 = { workspace = true }
+# strum = { workspace = true }
+# strum_macros = { workspace = true }
+# subtle = { workspace = true }
+# tar = "0.4.44"
+tokio = { workspace = true }
+# tokio-rustls = { workspace = true }
+# tokio-util = { version = "0.7.13", features = ["codec"] }
+tower = { version = "0.4.13", default-features = false }
+# tracing = { workspace = true }
+
+[dev-dependencies]
+test-log = { workspace = true }

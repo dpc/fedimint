@@ -7,12 +7,10 @@ use axum::response::{Html, IntoResponse, Redirect};
 use axum::routing::{get, post};
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use fedimint_core::module::ApiAuth;
+use fedimint_server_ui_common::DynUiBackend;
 use maud::{DOCTYPE, Markup, html};
 use serde::Deserialize;
 use tokio::net::TcpListener;
-
-use super::PeerConnectionInfo;
-use super::api::ConfigGenApi;
 
 #[derive(Debug, Deserialize)]
 struct SetupInput {
@@ -172,9 +170,10 @@ fn base_layout(title: &str, content: Markup) -> Markup {
 }
 
 // GET handler for the /setup route (display the setup form)
-async fn setup_form(State(config_api): State<Arc<ConfigGenApi>>) -> impl IntoResponse {
+async fn setup_form(State(state): UiState) -> impl IntoResponse {
     // Check if we already have local params set
-    if config_api.local_params().await.is_some() {
+    // if config_api.local_params().await.is_some() {
+    if state.backend.are_local_params_set().await {
         return Redirect::to("/federation-setup").into_response();
     }
 
@@ -210,10 +209,7 @@ async fn setup_form(State(config_api): State<Arc<ConfigGenApi>>) -> impl IntoRes
 }
 
 // POST handler for the /setup route (process the password setup form)
-async fn setup_submit(
-    State(config_api): State<Arc<ConfigGenApi>>,
-    Form(input): Form<SetupInput>,
-) -> impl IntoResponse {
+async fn setup_submit(State(state): UiState, Form(input): Form<SetupInput>) -> impl IntoResponse {
     // Create ApiAuth from password
     let auth = ApiAuth(input.password.clone());
 
@@ -240,7 +236,7 @@ async fn setup_submit(
 }
 
 // GET handler for the /login route (display the login form)
-async fn login_form(State(config_api): State<Arc<ConfigGenApi>>) -> impl IntoResponse {
+async fn login_form(State(state): UiState) -> impl IntoResponse {
     // Check if local params are set
     if config_api.local_params().await.is_none() {
         return Redirect::to("/").into_response();
@@ -264,7 +260,7 @@ async fn login_form(State(config_api): State<Arc<ConfigGenApi>>) -> impl IntoRes
 
 // POST handler for the /login route (authenticate and set session cookie)
 async fn login_submit(
-    State(config_api): State<Arc<ConfigGenApi>>,
+    State(state): UiState,
     jar: CookieJar,
     Form(input): Form<LoginInput>,
 ) -> impl IntoResponse {
@@ -305,7 +301,7 @@ async fn login_submit(
 
 // Helper function to check authentication - returns a redirect if
 // authentication fails
-async fn check_auth(config_api: &Arc<ConfigGenApi>, jar: &CookieJar) -> Option<Redirect> {
+async fn check_auth(State(state): UiState, jar: &CookieJar) -> Option<Redirect> {
     // Step 1: Get the session cookie if it exists
     let session_password = match jar.get("session") {
         Some(cookie) => cookie.value().to_string(),
@@ -327,10 +323,7 @@ async fn check_auth(config_api: &Arc<ConfigGenApi>, jar: &CookieJar) -> Option<R
 }
 
 // GET handler for the /federation-setup route (main federation management page)
-async fn federation_setup(
-    State(config_api): State<Arc<ConfigGenApi>>,
-    jar: CookieJar,
-) -> impl IntoResponse {
+async fn federation_setup(State(state): UiState, jar: CookieJar) -> impl IntoResponse {
     // Authenticate with session cookie
     if let Some(redirect) = check_auth(&config_api, &jar).await {
         return redirect.into_response();
@@ -427,7 +420,7 @@ async fn federation_setup(
 
 // POST handler for adding peer connection info
 async fn add_peer_handler(
-    State(config_api): State<Arc<ConfigGenApi>>,
+    State(state): UiState,
     jar: CookieJar,
     Form(input): Form<PeerInfoInput>,
 ) -> impl IntoResponse {
@@ -472,10 +465,7 @@ async fn add_peer_handler(
 }
 
 // POST handler for starting the DKG process
-async fn start_dkg_handler(
-    State(config_api): State<Arc<ConfigGenApi>>,
-    jar: CookieJar,
-) -> impl IntoResponse {
+async fn start_dkg_handler(State(state): UiState, jar: CookieJar) -> impl IntoResponse {
     // Authenticate with session cookie
     if let Some(redirect) = check_auth(&config_api, &jar).await {
         return redirect.into_response();
@@ -515,8 +505,14 @@ async fn start_dkg_handler(
     }
 }
 
+struct UiStateInner {
+    backend: DynUiBackend,
+}
+type SharedUiState = Arc<UiStateInner>;
+type UiState = State<SharedUiState>;
+
 // Main function to start the web UI with ConfigGenApi
-pub async fn start_web_ui(config_gen_api: ConfigGenApi, ui_bind: SocketAddr) {
+pub async fn start_web_ui(backend: DynUiBackend, ui_bind: SocketAddr) {
     // Build router with ConfigGenApi as state
     let app = Router::new()
         .route("/", get(setup_form).post(setup_submit))
@@ -524,7 +520,7 @@ pub async fn start_web_ui(config_gen_api: ConfigGenApi, ui_bind: SocketAddr) {
         .route("/federation-setup", get(federation_setup))
         .route("/add-peer", post(add_peer_handler))
         .route("/start-dkg", post(start_dkg_handler))
-        .with_state(Arc::new(config_gen_api));
+        .with_state(Arc::new(UiStateInner { backend }));
 
     // Run the Axum server
     println!("Federation setup UI running at http://{ui_bind} 🚀");
@@ -548,9 +544,6 @@ async fn start_web_ui_test() {
     use fedimint_core::util::SafeUrl;
     use fedimint_server_core::ServerModuleInitRegistry;
     use tokio::sync::mpsc;
-
-    use crate::ConfigGenSettings;
-    use crate::config::NetworkingStack;
 
     // Create an in-memory database for testing
     let db = MemDatabase::new().into();

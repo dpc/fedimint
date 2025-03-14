@@ -26,6 +26,7 @@ use fedimint_core::util::SafeUrl;
 use fedimint_core::{NumPeersExt, PeerId, base32, secp256k1, timing};
 use fedimint_logging::LOG_NET_PEER_DKG;
 use fedimint_server_core::config::PeerHandleOpsExt as _;
+use fedimint_server_core::net::NetworkingStack;
 use fedimint_server_core::{DynServerModuleInit, ServerModuleInitRegistry};
 use hex::{FromHex, ToHex};
 use peer_handle::PeerHandle;
@@ -43,7 +44,6 @@ pub mod api;
 pub mod distributedgen;
 pub mod io;
 pub mod peer_handle;
-pub mod web_ui;
 
 /// The default maximum open connections the API can handle
 pub const DEFAULT_MAX_CLIENT_CONNECTIONS: u32 = 1000;
@@ -177,14 +177,6 @@ pub fn legacy_consensus_config_hash(cfg: &ServerConfigConsensus) -> sha256::Hash
         meta: cfg.meta.clone(),
     }
     .consensus_hash_sha256()
-}
-
-/// The type of networking `fedimintd` should use
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub enum NetworkingStack {
-    #[default]
-    Tcp,
-    Iroh,
 }
 
 // FIXME: (@leonardo) Should this have another field for the expected transport

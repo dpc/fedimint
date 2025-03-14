@@ -19,6 +19,7 @@ pub fn g2(scalar: &Scalar) -> G2Projective {
 pub fn scalar(peer: &PeerId) -> Scalar {
     Scalar::from(peer.to_usize() as u64 + 1)
 }
+
 pub fn eval_poly_g1(coefficients: &[G1Projective], peer: &PeerId) -> G1Affine {
     coefficients
         .iter()
