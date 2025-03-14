@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::mem::discriminant;
 use std::str::FromStr as _;
+use std::sync::Arc;
 
 use anyhow::{Context, ensure};
 use async_trait::async_trait;
@@ -63,12 +64,24 @@ pub struct LocalParams {
     federation_name: Option<String>,
 }
 
+impl LocalParams {
+    /// Convert to PeerConnectionInfo
+    pub fn connection_info(&self) -> PeerConnectionInfo {
+        PeerConnectionInfo {
+            name: self.name.clone(),
+            endpoints: self.endpoints.clone(),
+            federation_name: self.federation_name.clone(),
+        }
+    }
+}
+
 /// Serves the config gen API endpoints
+#[derive(Clone)]
 pub struct ConfigGenApi {
     /// Our config gen settings configured locally
     settings: ConfigGenSettings,
     /// In-memory state machine
-    state: Mutex<ConfigGenState>,
+    state: Arc<Mutex<ConfigGenState>>,
     /// DB not really used
     db: Database,
     /// Triggers the distributed key generation
@@ -79,10 +92,28 @@ impl ConfigGenApi {
     pub fn new(settings: ConfigGenSettings, db: Database, sender: Sender<ConfigGenParams>) -> Self {
         Self {
             settings,
-            state: Mutex::new(ConfigGenState::default()),
+            state: Arc::new(Mutex::new(ConfigGenState::default())),
             db,
             sender,
         }
+    }
+
+    pub async fn local_params(&self) -> Option<LocalParams> {
+        self.state.lock().await.local_params.clone()
+    }
+
+    pub async fn auth(&self) -> Option<ApiAuth> {
+        self.local_params().await.map(|lp| lp.auth)
+    }
+
+    pub async fn connected_peers(&self) -> Vec<String> {
+        let state = self.state.lock().await;
+        state
+            .connection_info
+            .clone()
+            .into_iter()
+            .map(|info| info.name)
+            .collect()
     }
 
     pub async fn server_status(&self) -> ServerStatus {
@@ -108,7 +139,8 @@ impl ConfigGenApi {
     pub async fn set_local_parameters(
         &self,
         auth: ApiAuth,
-        request: SetLocalParamsRequest,
+        name: String,
+        federation_name: Option<String>,
     ) -> anyhow::Result<PeerConnectionInfo> {
         ensure!(
             auth.0.trim() == auth.0,
@@ -124,27 +156,21 @@ impl ConfigGenApi {
             );
 
             ensure!(
-                lp.name == request.name,
+                lp.name == name,
                 "Local parameters have already been set with a different name."
             );
 
             ensure!(
-                lp.federation_name == request.federation_name,
+                lp.federation_name == federation_name,
                 "Local parameters have already been set with a different federation name."
             );
 
-            let info = PeerConnectionInfo {
-                name: lp.name,
-                endpoints: lp.endpoints,
-                federation_name: lp.federation_name,
-            };
-
-            return Ok(info);
+            return Ok(lp.connection_info());
         }
 
         let lp = match self.settings.networking {
             NetworkingStack::Tcp => {
-                let (tls_cert, tls_key) = gen_cert_and_key(&request.name)
+                let (tls_cert, tls_key) = gen_cert_and_key(&name)
                     .expect("Failed to generate TLS for given guardian name");
 
                 LocalParams {
@@ -157,8 +183,8 @@ impl ConfigGenApi {
                         p2p_url: self.settings.p2p_url.clone(),
                         cert: tls_cert.0,
                     },
-                    name: request.name,
-                    federation_name: request.federation_name,
+                    name,
+                    federation_name,
                 }
             }
             NetworkingStack::Iroh => {
@@ -190,21 +216,15 @@ impl ConfigGenApi {
                         api_pk: iroh_api_sk.public(),
                         p2p_pk: iroh_p2p_sk.public(),
                     },
-                    name: request.name,
-                    federation_name: request.federation_name,
+                    name,
+                    federation_name,
                 }
             }
         };
 
         state.local_params = Some(lp.clone());
 
-        let info = PeerConnectionInfo {
-            name: lp.name,
-            endpoints: lp.endpoints,
-            federation_name: lp.federation_name,
-        };
-
-        Ok(info)
+        Ok(lp.connection_info())
     }
 
     pub async fn add_peer_connection_info(&self, info: PeerConnectionInfo) -> anyhow::Result<()> {
@@ -248,11 +268,7 @@ impl ConfigGenApi {
             .clone()
             .expect("The endpoint is authenticated.");
 
-        let our_peer_info = PeerConnectionInfo {
-            name: local_params.name,
-            endpoints: local_params.endpoints,
-            federation_name: local_params.federation_name,
-        };
+        let our_peer_info = local_params.connection_info();
 
         state.connection_info.insert(our_peer_info.clone());
 
@@ -274,8 +290,6 @@ impl ConfigGenApi {
             iroh_api_sk: local_params.iroh_api_sk,
             iroh_p2p_sk: local_params.iroh_p2p_sk,
             api_auth: local_params.auth,
-            p2p_bind: self.settings.p2p_bind,
-            api_bind: self.settings.api_bind,
             peers: (0..)
                 .map(|i| PeerId::from(i as u16))
                 .zip(state.connection_info.clone().into_iter())
@@ -336,7 +350,7 @@ pub fn server_endpoints() -> Vec<ApiEndpoint<ConfigGenApi>> {
                     .request_auth()
                     .ok_or(ApiError::bad_request("Missing password".to_string()))?;
 
-                let info = config.set_local_parameters(auth, request)
+                let info = config.set_local_parameters(auth, request.name, request.federation_name)
                     .await
                     .map_err(|e| ApiError::bad_request(e.to_string()))?;
 
