@@ -23,6 +23,7 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
+is-terminal = { workspace = true }
 opentelemetry = { workspace = true, optional = true }
 opentelemetry-jaeger = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }

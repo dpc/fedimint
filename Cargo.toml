@@ -235,6 +235,7 @@ iroh-base = { version = "=0.35.0", default-features = false }
 iroh-next = { version = "=0.90.0", default-features = false, package = "iroh" }
 iroh-next-base = { version = "=0.90.0", default-features = false, package = "iroh-base" }
 iroh-relay = { version = "=0.35.0", default-features = false }
+is-terminal = "0.4"
 itertools = "0.14.0"
 jaq-core = "2.1.1"
 jaq-json = { version = "1.1.1", features = ["serde_json"] }

@@ -3689,6 +3689,7 @@ version = "0.10.0-alpha"
 dependencies = [
  "anyhow",
  "console-subscriber",
+ "is-terminal",
  "opentelemetry 0.27.1",
  "opentelemetry-jaeger",
  "tracing-opentelemetry",
