@@ -262,7 +262,7 @@ let
         rust-bindgen
 
         # tests
-        (hiPrio pkgs.bashInteractive)
+        (lib.hiPrio pkgs.bashInteractive)
         bc
         bitcoind
         jq
