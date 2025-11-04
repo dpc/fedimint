@@ -1,7 +1,7 @@
 {
   lib,
   stdenv,
-  llvmPackages_12,
+  llvmPackages,
   fetchFromGitHub,
   rocksdb_8_3,
   Security,
@@ -46,7 +46,7 @@ rustPlatform.buildRustPackage {
 
   # https://stackoverflow.com/questions/76443280/rust-bindgen-causes-a-is-not-a-valid-ident-error-on-build
   preBuild = ''
-    export LIBCLANG_PATH="${llvmPackages_12.libclang.lib}/lib"
+    export LIBCLANG_PATH="${llvmPackages.libclang.lib}/lib"
   '';
 
   # link rocksdb dynamically
