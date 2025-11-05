@@ -102,7 +102,7 @@
             github.ci = {
               workflows.flakebox-flakehub-publish.enable = false;
             };
-            linker.wild.enable = false;
+            linker.wild.enable = true;
 
             toolchain.components = [
               "rustc"
