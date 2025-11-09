@@ -204,8 +204,8 @@ impl<M: Send + 'static> P2PConnection<M> {
         connection_type_sender: watch::Sender<ConnectionType>,
         task_group: &TaskGroup,
     ) -> P2PConnection<M> {
-        let (outgoing_sender, outgoing_receiver) = bounded(1024);
-        let (incoming_sender, incoming_receiver) = bounded(1024);
+        let (outgoing_sender, outgoing_receiver) = bounded(10240);
+        let (incoming_sender, incoming_receiver) = bounded(10240);
 
         let connector_clone = connector.clone();
         let connection_type_sender_clone = connection_type_sender.clone();

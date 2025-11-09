@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::iter::once;
+use std::time::Duration;
 
 use anyhow::{Context, bail, ensure};
 use async_trait::async_trait;
@@ -192,6 +193,7 @@ pub async fn run_dkg(
                     }
                 }
                 DkgStep::Result(result) => {
+                    // fedimint_core::runtime::sleep(Duration::from_millis(10)).await;
                     return Ok(result);
                 }
             }

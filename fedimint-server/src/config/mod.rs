@@ -621,6 +621,7 @@ impl ServerConfig {
                 .await?;
 
             module_cfgs.insert(module_id, cfg);
+            fedimint_core::runtime::sleep(Duration::from_secs(5)).await;
         }
 
         let cfg = ServerConfig::from(
@@ -639,6 +640,7 @@ impl ServerConfig {
             "Comparing consensus config checksum {checksum}..."
         );
 
+        fedimint_core::runtime::sleep(Duration::from_secs(5)).await;
         connections
             .send(Recipient::Everyone, P2PMessage::Checksum(checksum))
             .await;
@@ -669,6 +671,7 @@ impl ServerConfig {
             target: LOG_NET_PEER_DKG,
             "Config generation has completed successfully!"
         );
+        fedimint_core::runtime::sleep(Duration::from_secs(5)).await;
 
         Ok(cfg)
     }

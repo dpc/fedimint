@@ -29,7 +29,7 @@ use fedimint_core::{
     Amount, InPoint, NumPeersExt, OutPoint, PeerId, Tiered, TieredMulti, apply,
     async_trait_maybe_send, push_db_key_items, push_db_pair_items,
 };
-use fedimint_logging::LOG_MODULE_MINT;
+use fedimint_logging::{LOG_MODULE_MINT, LOG_NET};
 pub use fedimint_mint_common as common;
 use fedimint_mint_common::config::{
     FeeConsensus, MintClientConfig, MintConfig, MintConfigConsensus, MintConfigPrivate,
@@ -225,10 +225,13 @@ impl ServerModuleInit for MintInit {
     ) -> anyhow::Result<ServerModuleConfig> {
         let params = self.parse_params(params).unwrap();
 
+        info!(target: LOG_NET, "STARTING MINT");
         let mut amount_keys = HashMap::new();
 
         for amount in params.consensus.gen_denominations() {
+            info!(target: LOG_NET, %amount, "STARTING MINT AMOUNT");
             amount_keys.insert(amount, peers.run_dkg_g2().await?);
+            info!(target: LOG_NET, %amount, "DONEMINT AMOUNT");
         }
 
         let server = MintConfig {
@@ -264,6 +267,7 @@ impl ServerModuleInit for MintInit {
                 max_notes_per_denomination: DEFAULT_MAX_NOTES_PER_DENOMINATION,
             },
         };
+        info!(target: LOG_NET, "DONE MINT");
 
         Ok(server.to_erased())
     }
