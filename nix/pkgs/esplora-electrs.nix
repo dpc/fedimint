@@ -4,7 +4,6 @@
   llvmPackages,
   fetchFromGitHub,
   rocksdb_8_3,
-  Security,
   rustPlatform,
 }:
 let
@@ -52,8 +51,6 @@ rustPlatform.buildRustPackage {
   # link rocksdb dynamically
   ROCKSDB_INCLUDE_DIR = "${rocksdb}/include";
   ROCKSDB_LIB_DIR = "${rocksdb}/lib";
-
-  buildInputs = lib.optionals stdenv.isDarwin [ Security ];
 
   # rename to avoid a name conflict with other electrs package
   postInstall = ''
