@@ -49,6 +49,28 @@ fn bsats(satoshi: u64) -> bitcoin::Amount {
 
 const PEG_IN_AMOUNT_SATS: u64 = 10000;
 const PEG_OUT_AMOUNT_SATS: u64 = 1000;
+const FM_BITCOIND_WALLET_TEST_GROUP_ENV: &str = "FM_BITCOIND_WALLET_TEST_GROUP";
+
+fn should_skip_wallet_test_group(test_group: &str) -> bool {
+    match env::var(FM_BITCOIND_WALLET_TEST_GROUP_ENV) {
+        Ok(selected_group) if selected_group != test_group => {
+            info!(
+                selected_group,
+                test_group, "Skipping wallet test not in selected test group"
+            );
+            true
+        }
+        _ => false,
+    }
+}
+
+macro_rules! skip_if_not_wallet_test_group {
+    ($test_group:literal) => {
+        if crate::should_skip_wallet_test_group($test_group) {
+            return Ok(());
+        }
+    };
+}
 
 async fn peg_in<'a>(
     client: &'a ClientHandleArc,
@@ -172,6 +194,7 @@ async fn await_consensus_upgrade(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sanity_check_bitcoin_blocks() -> anyhow::Result<()> {
+    skip_if_not_wallet_test_group!("1");
     let fixtures = fixtures();
     let fed = fixtures.new_fed_degraded().await;
     let client = fed.new_client().await;
@@ -214,6 +237,7 @@ async fn sanity_check_bitcoin_blocks() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn on_chain_peg_in_and_peg_out_happy_case() -> anyhow::Result<()> {
+    skip_if_not_wallet_test_group!("2");
     let fixtures = fixtures();
     let fed = fixtures.new_fed_degraded().await;
     let client = fed.new_client().await;
@@ -367,6 +391,7 @@ async fn on_chain_peg_in_and_peg_out_happy_case() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn on_chain_peg_in_detects_multiple() -> anyhow::Result<()> {
+    skip_if_not_wallet_test_group!("2");
     let fixtures = fixtures();
     let fed = fixtures.new_fed_degraded().await;
     let client = fed.new_client().await;
@@ -444,6 +469,7 @@ async fn on_chain_peg_in_detects_multiple() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn peg_out_fail_refund() -> anyhow::Result<()> {
+    skip_if_not_wallet_test_group!("2");
     let fixtures = fixtures();
     let fed = fixtures.new_fed_degraded().await;
     let client = fed.new_client().await;
@@ -492,6 +518,7 @@ async fn peg_out_fail_refund() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn rbf_withdrawals_are_rejected() -> anyhow::Result<()> {
+    skip_if_not_wallet_test_group!("2");
     let fixtures = fixtures();
     let fed = fixtures.new_fed_degraded().await;
     let client = fed.new_client().await;
@@ -587,6 +614,7 @@ async fn rbf_withdrawals_are_rejected() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn peg_outs_must_wait_for_available_utxos() -> anyhow::Result<()> {
+    skip_if_not_wallet_test_group!("2");
     let fixtures = fixtures();
     let fed = fixtures.new_fed_degraded().await;
     let client = fed.new_client().await;
@@ -675,6 +703,7 @@ async fn peg_outs_must_wait_for_available_utxos() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn peg_ins_that_are_unconfirmed_are_rejected() -> anyhow::Result<()> {
+    skip_if_not_wallet_test_group!("1");
     let fixtures = fixtures();
     let bitcoin = fixtures.bitcoin();
     let dyn_bitcoin_rpc = fixtures.server_bitcoin_rpc();
@@ -821,6 +850,7 @@ async fn peg_ins_that_are_unconfirmed_are_rejected() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn dust_deposits_are_ignored() -> anyhow::Result<()> {
+    skip_if_not_wallet_test_group!("1");
     let fixtures = fixtures();
     let fed = fixtures.new_fed_degraded().await;
     let client = fed.new_client().await;
@@ -897,6 +927,7 @@ async fn dust_deposits_are_ignored() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn construct_wallet_summary() -> anyhow::Result<()> {
+    skip_if_not_wallet_test_group!("1");
     let fixtures = fixtures();
     let fed = fixtures.new_fed_degraded().await;
     let client = fed.new_client().await;
@@ -1101,6 +1132,7 @@ async fn construct_wallet_summary() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn verify_auto_consensus_voting() -> anyhow::Result<()> {
+    skip_if_not_wallet_test_group!("1");
     let fixtures = fixtures();
     let fed = fixtures.new_fed_not_degraded().await;
     let client = fed.new_client().await;
@@ -1414,6 +1446,7 @@ mod fedimint_migration_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn snapshot_server_db_migrations() -> anyhow::Result<()> {
+        skip_if_not_wallet_test_group!("1");
         snapshot_db_migrations::<_, WalletCommonInit>("wallet-server-v0", |db| {
             Box::pin(async {
                 create_server_db_with_v0_data(db.clone()).await;
@@ -1425,6 +1458,7 @@ mod fedimint_migration_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_server_db_migrations() -> anyhow::Result<()> {
+        skip_if_not_wallet_test_group!("1");
         let _ = TracingSetup::default().init();
 
         let module = DynServerModuleInit::from(WalletInit);
@@ -1618,6 +1652,7 @@ mod fedimint_migration_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn snapshot_client_db_migrations() -> anyhow::Result<()> {
+        skip_if_not_wallet_test_group!("1");
         snapshot_db_migrations_client::<_, _, WalletCommonInit>(
             "wallet-client-v0",
             |db| Box::pin(async { create_client_db_with_v0_data(db).await }),
@@ -1628,6 +1663,7 @@ mod fedimint_migration_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_client_db_migrations() -> anyhow::Result<()> {
+        skip_if_not_wallet_test_group!("1");
         let _ = TracingSetup::default().init();
 
         let module = DynClientModuleInit::from(WalletClientInit::default());
@@ -1668,6 +1704,9 @@ mod fedimint_migration_tests {
 
 #[test]
 fn verify_bitcoind_backend() {
+    if should_skip_wallet_test_group("1") {
+        return;
+    }
     let fixtures = fixtures();
     let dyn_bitcoin_rpc = fixtures.server_bitcoin_rpc();
     let bitcoin_rpc_kind = dyn_bitcoin_rpc.get_bitcoin_rpc_config().kind;
