@@ -114,10 +114,17 @@ impl IrohConnector {
         iroh_dns: Option<SafeUrl>,
         iroh_enable_dht: bool,
         iroh_enable_next: bool,
+        outbound_address_policy: Option<::iroh::OutboundAddressPolicy>,
     ) -> anyhow::Result<Self> {
         const FM_IROH_CONNECT_OVERRIDES_ENV: &str = "FM_IROH_CONNECT_OVERRIDES";
         const FM_GW_IROH_CONNECT_OVERRIDES_ENV: &str = "FM_GW_IROH_CONNECT_OVERRIDES";
-        let mut s = Self::new_no_overrides(iroh_dns, iroh_enable_dht, iroh_enable_next).await?;
+        let mut s = Self::new_no_overrides(
+            iroh_dns,
+            iroh_enable_dht,
+            iroh_enable_next,
+            outbound_address_policy,
+        )
+        .await?;
 
         for (k, v) in parse_kv_list_from_env::<_, NodeTicket>(FM_IROH_CONNECT_OVERRIDES_ENV)? {
             s = s.with_connection_override(k, v.into());
@@ -135,11 +142,15 @@ impl IrohConnector {
         iroh_dns: Option<SafeUrl>,
         iroh_enable_dht: bool,
         iroh_enable_next: bool,
+        outbound_address_policy: Option<::iroh::OutboundAddressPolicy>,
     ) -> anyhow::Result<Self> {
         let endpoint_stable = Box::pin({
             let iroh_dns = iroh_dns.clone();
             async {
                 let mut builder = Endpoint::builder();
+                if let Some(policy) = outbound_address_policy {
+                    builder = builder.outbound_address_policy(policy);
+                }
 
                 if let Some(iroh_dns) = iroh_dns.map(SafeUrl::to_unsafe) {
                     builder = builder.add_discovery(|_| Some(PkarrResolver::new(iroh_dns)));

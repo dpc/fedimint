@@ -2,6 +2,7 @@ pub mod error;
 pub mod http;
 pub mod iroh;
 pub mod metrics;
+pub mod outbound_address;
 #[cfg(all(feature = "tor", not(target_family = "wasm")))]
 pub mod tor;
 pub mod ws;
@@ -58,6 +59,8 @@ pub struct ConnectorRegistryBuilder {
     iroh_next: bool,
     /// Enable Pkarr DHT discovery
     iroh_pkarr_dht: bool,
+    /// Policy for stable Iroh's concrete outbound socket addresses.
+    iroh_outbound_address_policy: Option<::iroh::OutboundAddressPolicy>,
 
     /// Enable Websocket API handling at all?
     ws_enable: bool,
@@ -128,9 +131,17 @@ impl ConnectorRegistryBuilder {
         if !self.iroh_enable {
             bail!("Iroh connector not enabled");
         }
+        if self.iroh_outbound_address_policy.is_some() && self.iroh_next {
+            bail!("Iroh next does not support outbound address policies");
+        }
         Ok(Arc::new(
-            iroh::IrohConnector::new(self.iroh_dns.clone(), self.iroh_pkarr_dht, self.iroh_next)
-                .await?,
+            iroh::IrohConnector::new(
+                self.iroh_dns.clone(),
+                self.iroh_pkarr_dht,
+                self.iroh_next,
+                self.iroh_outbound_address_policy.clone(),
+            )
+            .await?,
         ) as DynConnector)
     }
 
@@ -171,6 +182,16 @@ impl ConnectorRegistryBuilder {
     pub fn iroh_next(self, enable: bool) -> Self {
         Self {
             iroh_next: enable,
+            ..self
+        }
+    }
+
+    /// Sets stable Iroh's concrete outbound socket-address policy.
+    ///
+    /// Iroh next must remain disabled while this policy is configured.
+    pub fn iroh_outbound_address_policy(self, policy: ::iroh::OutboundAddressPolicy) -> Self {
+        Self {
+            iroh_outbound_address_policy: Some(policy),
             ..self
         }
     }
@@ -284,6 +305,7 @@ impl ConnectorRegistry {
             iroh_dns: None,
             iroh_pkarr_dht: false,
             iroh_next: false,
+            iroh_outbound_address_policy: None,
             ws_enable: true,
             ws_force_tor: false,
             http_enable: true,
@@ -308,6 +330,7 @@ impl ConnectorRegistry {
             iroh_dns: None,
             iroh_pkarr_dht: false,
             iroh_next: false,
+            iroh_outbound_address_policy: None,
             ws_enable: true,
             ws_force_tor: false,
             http_enable: false,
@@ -332,6 +355,7 @@ impl ConnectorRegistry {
             iroh_dns: None,
             iroh_pkarr_dht: false,
             iroh_next: false,
+            iroh_outbound_address_policy: None,
             ws_enable: true,
             ws_force_tor: false,
             http_enable: true,

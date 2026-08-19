@@ -148,7 +148,6 @@ bdk_esplora = { version = "0.22.1", default-features = false }
 bdk_wallet = "2.3.0"
 bech32 = "0.11.1"
 bincode = "1.3.3"
-ciborium = "0.2.2"
 bip39 = "2.2.2"
 bitcoin = { version = "0.32.6", features = ["serde"] }
 bitcoin-io = "0.1.2"
@@ -161,6 +160,7 @@ bon = "3.6.5"
 bytes = "1.11.1"
 chacha20poly1305 = "0.10.1"
 chrono = "0.4.44"
+ciborium = "0.2.2"
 clap = { version = "4.5.60", features = ["derive", "env"] }
 clap_complete = "4.5.66"
 console-subscriber = "0.4.1"
@@ -259,14 +259,14 @@ honggfuzz = { version = "=0.5.55", default-features = false } # needs to be pinn
 hyper = "1.6"
 imbl = "5.0.0"
 impl-tools = "0.10.3"
-iroh = { version = "=0.35.0", default-features = false }
-iroh-base = { version = "=0.35.0", default-features = false }
+iroh = { git = "https://github.com/dpc/iroh", rev = "2e66ba8c897bc2c632f8325721fcb6b3d2e14df6", default-features = false }
+iroh-base = { git = "https://github.com/dpc/iroh", rev = "2e66ba8c897bc2c632f8325721fcb6b3d2e14df6", default-features = false }
 iroh-mainline-address-lookup = "0.4.0"
 iroh-next = { version = "=1.0.0", default-features = false, features = [
     "tls-ring",
 ], package = "iroh" }
 iroh-next-base = { version = "=1.0.0", default-features = false, package = "iroh-base" }
-iroh-relay = { version = "=0.35.0", default-features = false }
+iroh-relay = { git = "https://github.com/dpc/iroh", rev = "2e66ba8c897bc2c632f8325721fcb6b3d2e14df6", default-features = false }
 itertools = "0.14.0"
 jaq-core = "2.1.1"
 jaq-json = { version = "1.1.1", features = ["serde_json"] }
