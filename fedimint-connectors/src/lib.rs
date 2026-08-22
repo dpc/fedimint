@@ -62,6 +62,8 @@ pub struct ConnectorRegistryBuilder {
     /// Enable Websocket API handling at all?
     ws_enable: bool,
     ws_force_tor: bool,
+    #[cfg(not(target_family = "wasm"))]
+    ws_follow_redirects: bool,
 
     // Enable HTTP
     http_enable: bool,
@@ -147,7 +149,12 @@ impl ConnectorRegistryBuilder {
                 Ok(Arc::new(TorConnector::bootstrap().await?) as DynConnector)
             }
 
-            false => Ok(Arc::new(WebsocketConnector::new()) as DynConnector),
+            false => {
+                let connector = WebsocketConnector::new();
+                #[cfg(not(target_family = "wasm"))]
+                let connector = connector.follow_redirects(self.ws_follow_redirects);
+                Ok(Arc::new(connector) as DynConnector)
+            }
             #[allow(unreachable_patterns)]
             _ => bail!("Tor requested, but not support not compiled in"),
         }
@@ -178,6 +185,24 @@ impl ConnectorRegistryBuilder {
     pub fn ws_force_tor(self, enable: bool) -> Self {
         Self {
             ws_force_tor: enable,
+            ..self
+        }
+    }
+
+    /// Configure whether the native WebSocket client follows redirects.
+    ///
+    /// The registry applies connection overrides before calling its connector,
+    /// so callers relying on redirect rejection must ensure no override changes
+    /// the separately validated, exact URL. The narrow guarantee covers `ws`
+    /// with a single IP-literal address and IPv4-literal `wss`; it excludes
+    /// hostname `wss`, IPv6-literal `wss`, SafeUrl policy, DNS/TCP pinning,
+    /// TLS/SNI control, and proxy/routing control. The underlying client may
+    /// still resolve a hostname in the redirect response. See
+    /// [`WebsocketConnector::follow_redirects`] for the full boundary.
+    #[cfg(not(target_family = "wasm"))]
+    pub fn ws_follow_redirects(self, enable: bool) -> Self {
+        Self {
+            ws_follow_redirects: enable,
             ..self
         }
     }
@@ -286,6 +311,8 @@ impl ConnectorRegistry {
             iroh_next: false,
             ws_enable: true,
             ws_force_tor: false,
+            #[cfg(not(target_family = "wasm"))]
+            ws_follow_redirects: true,
             http_enable: true,
 
             connection_overrides: API_REPLACEMENT_LIST
@@ -310,6 +337,8 @@ impl ConnectorRegistry {
             iroh_next: false,
             ws_enable: true,
             ws_force_tor: false,
+            #[cfg(not(target_family = "wasm"))]
+            ws_follow_redirects: true,
             http_enable: false,
 
             connection_overrides: API_REPLACEMENT_LIST
@@ -334,6 +363,8 @@ impl ConnectorRegistry {
             iroh_next: false,
             ws_enable: true,
             ws_force_tor: false,
+            #[cfg(not(target_family = "wasm"))]
+            ws_follow_redirects: true,
             http_enable: true,
 
             connection_overrides: BTreeMap::default(),
