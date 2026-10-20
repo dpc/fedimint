@@ -360,7 +360,8 @@ wasm-bindgen = "=0.2.106" # must match the nix provided wasm-bindgen-cli version
 wasm-bindgen-futures = "0.4.56"
 wasm-bindgen-test = "0.3.56"
 web-sys = "0.3.83"
-webpki-roots = "1.0.6"
+webpki = { package = "rustls-webpki", version = "0.103.16", default-features = false }
+webpki-roots = "1.0.10"
 z32 = "1"
 
 [workspace.lints.clippy]

@@ -10,6 +10,8 @@ version = { workspace = true }
 
 [package.metadata.cargo-udeps.ignore]
 development = ["tokio-test"]
+# This dependency imposes a security floor on rustls's transitive verifier.
+normal = ["webpki"]
 
 [lib]
 name = "fedimint_core"
@@ -72,6 +74,9 @@ iroh = { workspace = true, default-features = false, features = [
 ] }
 tokio = { workspace = true, features = ["full", "tracing"] }
 tokio-rustls = { workspace = true }
+# Keep the eMudhra SPKI distrust fix even when consumers resolve their own lockfile.
+# This does not constrain older, semver-incompatible webpki versions.
+webpki = { workspace = true }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 async-lock = { workspace = true }

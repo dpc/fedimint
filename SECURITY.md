@@ -1,5 +1,46 @@
 # Security Policy
 
+## October 2026 eMudhra CA compromise mitigation
+
+Native builds require `rustls-webpki` 0.103.16 or newer in the 0.103 series
+and `webpki-roots` 1.0.10 or newer. The verifier update distrusts the eight
+compromised intermediate public keys, including cross-signed paths. Removing
+only the emSign root is not enough. See the [public disclosure](https://emudhra.we-have-a-problem.com/),
+[verifier fix](https://github.com/rustls/webpki/pull/546), and
+[root update](https://github.com/rustls/webpki-roots/pull/133).
+
+Rebuild, release, and deploy the affected native clients, gateways, and
+guardians to apply the lockfile update. Already-installed binaries remain
+unchanged. The explicit native `fedimint-core` dependency also requires the
+patched 0.103 verifier when downstream applications resolve their own lockfiles.
+Downstream integrators must still audit all resolved TLS versions: this minimum
+does not upgrade semver-incompatible verifier copies.
+
+The update covers the standard rustls 0.23 certificate-validation paths, including
+native federation WSS, HTTPS through reqwest 0.12, and TLS to destination servers
+over Tor. Native Iroh relay and pkarr connections also use the patched verifier:
+they pass `EmbeddedWebPki` to reqwest as preconfigured TLS, despite the presence
+of a platform-verifier dependency. The update rejects otherwise valid services
+using a compromised intermediate; those services need replacement certificates.
+Removing the bundled root may also reject other chains that rely on that root
+alone.
+
+Limitations:
+
+- The legacy LDK dependency still uses reqwest 0.11 / rustls 0.21 /
+  rustls-webpki 0.101. This patch does **not** protect that stack. LDK Esplora
+  transaction sync still uses it at runtime; the existing Bitcoind chain-source
+  configuration avoids this old HTTPS path. The old VSS HTTPS dependency also
+  remains, but Fedimint builds the SQLite backend. Updating the operating system
+  trust store alone does not fix the old stack's bundled roots. Do not treat an
+  LDK gateway using Esplora as fully mitigated.
+- Browser/WASM HTTP and WebSocket connections use browser-managed TLS.
+  Keep the browser and its revocation data updated; Rust dependency updates
+  cannot change that verifier.
+- This change does not secure plain HTTP/WS, connections with verification
+  disabled, or external services or binaries. Explicit peer-key/certificate
+  authentication is distinct from public CA trust.
+
 ## Reporting a Vulnerability
 
 Do **not** open a public GitHub issue for security bugs that affect released
